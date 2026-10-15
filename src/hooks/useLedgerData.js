@@ -1,10 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSession } from '@/lib/auth-client';
 
 /**
  * Loads a ledger-shaped dataset and keeps it in sync with the session.
+ *
+ * The loader is called directly, with no `getSession()` in front of it. That
+ * check used to be a separate round trip that gated the real fetch, so a cold
+ * dashboard cost three sequential server calls before the first row appeared:
+ * `proxy`, then `/api/auth/get-session`, then `/api/ledger`. It was also
+ * redundant — `/api/ledger` already answers `401 'Sesi tidak ditemukan. Silakan
+ * masuk kembali.'` for a missing session, and `callLedger` turns that into a
+ * `DataError` carrying the same string, so the pages that render
+ * `<ErrorState message={error} />` show exactly what they showed before. One
+ * request now carries both the data and the session verdict.
  */
 export function useLedgerData(load) {
   const [state, setState] = useState({ data: null, loading: true, error: null });
@@ -18,13 +27,6 @@ export function useLedgerData(load) {
 
     const run = async () => {
       try {
-        const { data: sessionData } = await getSession();
-
-        if (!sessionData?.session) {
-          if (active) setState({ data: null, loading: false, error: null });
-          return;
-        }
-
         const data = await loadRef.current();
         if (active) setState({ data, loading: false, error: null });
       } catch (err) {

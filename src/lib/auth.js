@@ -124,6 +124,28 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days
     updateAge: 60 * 60 * 24, // 1 day
+
+    /**
+     * Serve the session from a signed cookie instead of querying Postgres for
+     * it. A cold dashboard used to look the session up six times — once in
+     * `proxy.ts` on every request, four times from the components that each
+     * called `getSession()` on mount, and once more inside `/api/ledger`. Every
+     * one of those was a round trip to the database to read a row the previous
+     * one had just read.
+     *
+     * `maxAge` is the real trade-off, so it is short on purpose: this is a cache
+     * of a revocation decision, and for `maxAge` a session revoked elsewhere —
+     * the idle auto-logout in another tab, a purge that ran the grace period
+     * out — stays readable for at most that long. Five minutes is invisible to
+     * a person and short enough that the window is not a way to keep using a
+     * dead session. `signOut` deletes the cookie itself
+     * (`deleteSessionCookie`), so the app's own logout never waits it out.
+     */
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 5,
+      strategy: 'compact',
+    },
   },
   baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
   secret: process.env.BETTER_AUTH_SECRET,

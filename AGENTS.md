@@ -308,4 +308,30 @@ Rotating a Google client secret: Cloud Console → Credentials → edit → rese
 - **A session lookup that rejects must not be swallowed.** `IdleLogout` arms the
   controller from a bare `.then`; when that was the whole chain, a rejected
   `getSession()` left the guard simply missing, silently, forever.
+- **`session.cookieCache` is on, and `maxAge` is the security budget.** Better
+  Auth serves the session from a signed cookie instead of a Postgres lookup. A
+  cold dashboard used to read the same session row six times — once in
+  `proxy.ts` on every request, four times from components that each called
+  `getSession()` on mount, and once more inside `/api/ledger`. The cost was
+  worst cold: `db.js` drops idle connections after 10s, so each of those also
+  paid a fresh TLS handshake. **A revoked session stays readable for up to
+  `maxAge`** — an idle auto-logout in another tab, or a purge that ran the grace
+  period out, is not seen until it expires. Five minutes is the deliberate
+  number: invisible to a person, short enough not to be a way to keep using a
+  dead session. `signOut` deletes the cookie itself, so the app's own logout
+  never waits it out. Raise it only with a reason, and never past `updateAge`.
+- **Client code never calls `getSession()` directly — it calls
+  `getSharedSession()`.** Every authenticated page mounts `ThemeProvider`,
+  `SidebarWithSession` and `IdleLogout` at once, all asking the same question;
+  `getSharedSession` in `auth-client.js` collapses them into one request. It is
+  a de-duplicator, not a cache: the in-flight promise is dropped the moment it
+  settles, so nothing is ever served stale.
+- **`useLedgerData` does not check the session before loading.** It used to
+  `await getSession()` and only then fetch, which made a cold dashboard three
+  sequential server calls — `proxy`, `/api/auth/get-session`, `/api/ledger` —
+  before a single row appeared. `/api/ledger` already answers `401 'Sesi tidak
+  ditemukan. Silakan masuk kembali.'`, and `callLedger` turns that into a
+  `DataError` with the same string, so the pages' `<ErrorState message={error} />`
+  is byte-identical either way. Do not reintroduce a pre-flight session check;
+  it cannot make the failure case any better and it always costs a round trip.
 - **No pagination** on transactions — the list grows with usage.

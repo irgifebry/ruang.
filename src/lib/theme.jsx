@@ -20,7 +20,8 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getSession } from '@/lib/auth-client';
+import { getSharedSession } from '@/lib/auth-client';
+import { useProfile } from '@/hooks/useProfile';
 import { THEME_KEY, applyTheme, readStoredTheme, storeTheme } from '@/lib/theme-presets';
 
 const ThemeContext = createContext(null);
@@ -39,23 +40,17 @@ export function ThemeProvider({ children }) {
     storeTheme(theme);
   }, [theme]);
 
-  // The cache is only a cache: the saved value lives on `profiles`, so pull it
-  // once on mount and let it win. Without this, signing in on a new device would
-  // show the other device's stale theme until the user changed it by hand.
+  // Who is signed in. Shares the shell's in-flight read rather than asking on
+  // its own — this used to be a second `getSession()` for an answer two sibling
+  // components were fetching at the same moment.
+  const [userId, setUserId] = useState(null);
+
   useEffect(() => {
     let active = true;
 
-    getSession()
-      .then(async ({ data }) => {
-        if (!data?.session) return;
-
-        const res = await fetch('/api/ledger', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'fetchProfile' }),
-        });
-        const profile = await res.json();
-        if (active && profile?.theme) setTheme(profile.theme);
+    getSharedSession()
+      .then(({ data }) => {
+        if (active) setUserId(data?.user?.id ?? null);
       })
       .catch(() => {});
 
@@ -63,6 +58,20 @@ export function ThemeProvider({ children }) {
       active = false;
     };
   }, []);
+
+  // The cache is only a cache: the saved value lives on `profiles`, so pull it
+  // once on mount and let it win. Without this, signing in on a new device would
+  // show the other device's stale theme until the user changed it by hand.
+  //
+  // Read from the shared profile cache the sidebar already fills instead of
+  // asking for `fetchProfile` here as well. Both used to fire on every cold
+  // load, each paying for the same row — and on the bare routes, where there is
+  // no sidebar, this one was paying for it alone.
+  const { profile, resolved } = useProfile(userId);
+
+  useEffect(() => {
+    if (resolved && profile?.theme) setTheme(profile.theme);
+  }, [resolved, profile?.theme]);
 
   // 'system' tracks the OS live: the user can flip their desktop to light while
   // the tab is open.

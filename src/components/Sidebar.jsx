@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { getSession, signOut } from '@/lib/auth-client';
+import { getSharedSession, signOut } from '@/lib/auth-client';
 import { clearIdleState } from '@/lib/idle-logout';
 import { toggleSidebar, isRailToggleClick } from '@/lib/sidebar';
 import { useProfile } from '@/hooks/useProfile';
@@ -437,7 +437,7 @@ export function SidebarWithSession() {
   const router = useRouter();
 
   useEffect(() => {
-    getSession().then(({ data }) => setSession(data ?? null));
+    getSharedSession().then(({ data }) => setSession(data ?? null));
   }, []);
 
   const handleSignOut = async () => {

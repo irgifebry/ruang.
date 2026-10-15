@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getSession, signOut } from '@/lib/auth-client';
+import { getSharedSession, signOut } from '@/lib/auth-client';
 import { IDLE_TIMEOUT_MS, IDLE_WARNING_MS, clearIdleState, createIdleController } from '@/lib/idle-logout';
 import { ConfirmDialog } from './confirm-dialog';
 
@@ -103,7 +103,7 @@ export default function IdleLogout() {
     });
     controllerRef.current = controller;
 
-    getSession()
+    getSharedSession()
       .then(({ data }) => {
         if (!active) return;
         // Nothing to guard without a session — and any clock left behind by a

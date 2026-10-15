@@ -7,7 +7,7 @@ import { useTheme } from '@/lib/theme';
 import { THEMES } from '@/lib/theme-presets';
 import { refreshProfile } from '@/hooks/useProfile';
 import { createClient } from '@/lib/client';
-import { getSession } from '@/lib/auth-client';
+import { getSharedSession } from '@/lib/auth-client';
 import { Button, FormMessage, TextField } from '@/components/form';
 import { PasswordPanel } from '@/components/PasswordPanel';
 import { DeleteAccountPanel } from '@/components/DeleteAccountPanel';
@@ -57,7 +57,7 @@ function ProfileContent({ data, reload }) {
   const [run, busy, mutationError, setMutationError] = useMutation();
 
   useEffect(() => {
-    getSession()
+    getSharedSession()
       .then(({ data }) => setEmail(data?.user?.email ?? ''))
       .catch(() => setEmail(''))
       .finally(() => setEmailLoading(false));
