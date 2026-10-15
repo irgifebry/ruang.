@@ -5,7 +5,7 @@ import { formatDateLong, formatIDR, formatIDRCompact } from '@/lib/money';
 import { EmptyState } from './ui';
 
 /**
- * A single expense row.
+ * A single transaction row — an expense, or an income entry.
  *
  * The layout is a three-column grid rather than nested flex boxes so the amount
  * stays right-aligned and never wraps, and the middle column truncates. The
@@ -26,11 +26,26 @@ import { EmptyState } from './ui';
  * four pieces its own space and nothing to truncate. The amount uses the compact
  * form there because it is the one column that cannot wrap; the exact rupiah is
  * on `title`, and the full figure ships from `sm` up where there is room for it.
+ *
+ * `kind` is the only difference between the two row types, and it is applied to
+ * the three places a reader could otherwise confuse them: the sign, the colour,
+ * and the secondary line. Income rows carry a `source` where expenses carry a
+ * category, because "where did this money come from" is a label rather than an
+ * envelope — there is nothing in the schema to compare a source against.
  */
-export function ExpenseRow({ expense, budget, onEdit, onDelete, dense = false, index = 0 }) {
-  const color = budget?.color ?? 'lime';
-  const categoryName = budget?.name ?? 'Tanpa kategori';
-  const expenseInitial = expense.description?.slice(0, 1).toUpperCase() ?? '?';
+export function ExpenseRow({ expense, budget, kind, onEdit, onDelete, dense = false, index = 0 }) {
+  // `kind` wins when a list is all one kind — that is what the transactions
+  // screen's tabs have. A mixed list (the dashboard's "Terbaru") passes no
+  // `kind` and lets each row declare its own, so the sign, colour and label of a
+  // row never depend on where it happens to sit in a list.
+  const isIncome = kind ? kind === 'income' : expense?.direction === 'income';
+  const color = isIncome ? 'lime' : budget?.color ?? 'lime';
+  const categoryName = isIncome
+    ? expense.source || 'Pemasukan'
+    : budget?.name ?? 'Tanpa kategori';
+  const expenseInitial = isIncome ? '+' : expense.description?.slice(0, 1).toUpperCase() ?? '?';
+  const dateValue = isIncome ? expense.received_on : expense.spent_on;
+  const amountTone = isIncome ? 'text-ruang-accent-text' : 'text-ruang-ink';
 
   return (
     /* Three columns on desktop, two rows on a phone. The grid is what makes the
@@ -69,7 +84,7 @@ export function ExpenseRow({ expense, budget, onEdit, onDelete, dense = false, i
           title={categoryName}
         >
           {categoryName} <span className="text-ruang-ghost px-[3px]">·</span>
-          <time dateTime={expense.spent_on}>{formatDateLong(expense.spent_on)}</time>
+          <time dateTime={dateValue}>{formatDateLong(dateValue)}</time>
         </small>
       </div>
 
@@ -78,17 +93,19 @@ export function ExpenseRow({ expense, budget, onEdit, onDelete, dense = false, i
           whole of column two — placing it in the same cell as the text was what
           made the two overlap. */}
       <strong
-        className="hidden sm:block font-mono text-[13px] text-ruang-ink whitespace-nowrap flex-none"
+        className={`hidden sm:block font-mono text-[13px] ${amountTone} whitespace-nowrap flex-none`}
         title={`${formatIDR(expense.amount)}`}
       >
-        &minus;{formatIDR(expense.amount)}
+        {isIncome ? '+' : '−'}
+        {formatIDR(expense.amount)}
       </strong>
 
       <strong
-        className="sm:hidden col-start-3 row-start-1 justify-self-end self-center font-mono text-[13px] text-ruang-ink whitespace-nowrap"
+        className={`sm:hidden col-start-3 row-start-1 justify-self-end self-center font-mono text-[13px] ${amountTone} whitespace-nowrap`}
         title={`${formatIDR(expense.amount)}`}
       >
-        &minus;{formatIDRCompact(expense.amount)}
+        {isIncome ? '+' : '−'}
+        {formatIDRCompact(expense.amount)}
       </strong>
 
       {(onEdit || onDelete) && (
@@ -145,7 +162,7 @@ function TrashGlyph() {
 }
 
 /** The whole list, including its empty state. */
-export function ExpenseList({ expenses, budgets = [], onEdit, onDelete, dense, emptyLabel }) {
+export function ExpenseList({ expenses, budgets = [], kind, onEdit, onDelete, dense, emptyLabel }) {
   if (!expenses.length) {
     return <EmptyState>{emptyLabel ?? 'Belum ada transaksi. Catat pengeluaran pertama.'}</EmptyState>;
   }
@@ -159,6 +176,7 @@ export function ExpenseList({ expenses, budgets = [], onEdit, onDelete, dense, e
           key={expense.id}
           expense={expense}
           budget={expense.budgets ?? byId.get(expense.category_id)}
+          kind={kind}
           onEdit={onEdit}
           onDelete={onDelete}
           dense={dense}

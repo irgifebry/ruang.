@@ -113,6 +113,7 @@ async function destroyRows(ids) {
     await client.query('BEGIN');
     for (const id of ids) {
       await client.query('DELETE FROM expenses WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM incomes WHERE user_id = $1', [id]);
       await client.query('DELETE FROM budgets WHERE user_id = $1', [id]);
       await client.query('DELETE FROM salary_records WHERE user_id = $1', [id]);
       await client.query('DELETE FROM profiles WHERE id = $1', [id]);

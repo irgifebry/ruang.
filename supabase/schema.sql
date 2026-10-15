@@ -63,12 +63,37 @@ create table public.salary_records (
 comment on table public.salary_records is
   'Gaji bulanan yang berlaku pada bulan tersebut (tanggal selalu tanggal 1).';
 
+-- Money that arrives outside the salary: a THR, a bonus, anything else that
+-- lands in the account. Not a cashback — that is a rebate on spending, and
+-- counting it as inflow would overstate how much went out. Deliberately
+-- *not* a category:
+-- `budgets` is an envelope table, and a monthly limit, a colour and the cascade
+-- from `expenses` mean nothing for money coming in. The free-text `source` is
+-- only a label; the row itself is identified by `description`.
+--
+-- This is the fresh-project shape. The deployed project has `user_id` as text
+-- pointing at Better Auth's `public."user"` instead, because Better Auth never
+-- writes `auth.users`; see supabase/migrations/20261016_incomes.sql.
+create table public.incomes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  description text not null check (char_length(trim(description)) between 1 and 80),
+  source text check (source is null or char_length(trim(source)) between 1 and 40),
+  amount numeric(14, 2) not null check (amount > 0),
+  received_on date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.incomes is
+  'Uang masuk di luar gaji: THR, bonus, atau pemasukan lain di luar gaji. Gaji tetap dicatat di salary_records.';
+
 -------------------------------------------------------------------------------
 -- Indexes
 -------------------------------------------------------------------------------
 
 create index budgets_user_id_idx on public.budgets(user_id);
 create index expenses_user_date_idx on public.expenses(user_id, spent_on desc);
+create index incomes_user_date_idx on public.incomes(user_id, received_on desc);
 -- History aggregates strictly by month, which this serves better than the
 -- composite index above.
 create index expenses_user_month_idx on public.expenses(user_id, spent_on);
@@ -113,6 +138,7 @@ alter table public.profiles enable row level security;
 alter table public.budgets enable row level security;
 alter table public.expenses enable row level security;
 alter table public.salary_records enable row level security;
+alter table public.incomes enable row level security;
 
 create policy "Users manage own profile" on public.profiles
   for all to authenticated
@@ -146,6 +172,11 @@ create policy "Users manage own expenses" on public.expenses
   );
 
 create policy "Users manage own salary records" on public.salary_records
+  for all to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+create policy "Users manage own incomes" on public.incomes
   for all to authenticated
   using ((select auth.uid()) = user_id)
   with check ((select auth.uid()) = user_id);

@@ -49,8 +49,21 @@ export async function fetchLedger() {
   return callLedger('fetchLedger');
 }
 
+/**
+ * One row per month for the history page.
+ *
+ * A month qualifies once its salary has been *saved* — that has always been the
+ * rule, and it is what keeps an untouched month from filling the list with rows
+ * the user never entered anything into. Income recorded without a salary does
+ * not promote a month into the history for the same reason: the history is a
+ * per-month statement, and without a salary the row has no funding to report.
+ *
+ * `saved` is now measured against the month's whole inflow (salary plus every
+ * income row dated in it) rather than the salary alone. `salary` and `income`
+ * are both returned so the page can show the breakdown.
+ */
 export function buildHistoryRows(data) {
-  const { salaryRows = [], months = [], budgets = [] } = data ?? {};
+  const { salaryRows = [], months = [], budgets = [], incomesByMonth = {} } = data ?? {};
   const salaryByMonth = new Map(
     salaryRows
       .map((row) => [row.month, toPositive(row.salary)])
@@ -62,13 +75,19 @@ export function buildHistoryRows(data) {
     .map((month) => {
       const salary = salaryByMonth.get(`${month.key}-01`);
       const spent = month.spent;
+      const monthIncomes = incomesByMonth[month.key] ?? [];
+      const income = monthIncomes.reduce((sum, row) => sum + toPositive(row?.amount), 0);
+      const inflow = salary + income;
 
       return {
         ...month,
         salary,
+        income,
+        inflow,
         spent,
-        saved: salary - spent,
-        savedPercent: ratioPercent(salary - spent, salary),
+        incomeCount: monthIncomes.length,
+        saved: inflow - spent,
+        savedPercent: ratioPercent(inflow - spent, inflow),
         categories: budgets
           .map((budget) => ({ ...budget, spent: month.byCategory[budget.id] ?? 0 }))
           .filter((category) => category.spent > 0)
@@ -88,9 +107,22 @@ export async function fetchSalaryHistory(supabaseOrMonths, maybeMonths = 12) {
   }));
 }
 
+/**
+ * Budgets, monthly spending and monthly income over the last `months` months.
+ *
+ * `months` only ever contains buckets built from spending, which is what the
+ * history list is made of. A month with income in it and no expenses at all
+ * therefore has no bucket, and `buildHistoryRows` drops it for the same reason
+ * it drops a month with no saved salary: nothing to compare the inflow against.
+ * `incomesByMonth` is returned raw for exactly that reason — the bucket shape is
+ * about spending, and a bucket-per-month for income would be a second, emptier
+ * shape for the same key.
+ */
 export async function fetchMonthlyBreakdown(supabaseOrMonths, maybeMonths = 12) {
   const months = typeof supabaseOrMonths === 'number' ? supabaseOrMonths : maybeMonths;
-  const { budgets = [], byMonth = {} } = await callLedger('fetchMonthlyBreakdown', { months });
+  const { budgets = [], byMonth = {}, incomesByMonth = {} } = await callLedger('fetchMonthlyBreakdown', {
+    months,
+  });
 
   const buckets = {};
   for (const [key, expenses] of Object.entries(byMonth)) {
@@ -107,6 +139,7 @@ export async function fetchMonthlyBreakdown(supabaseOrMonths, maybeMonths = 12) 
   return {
     budgets,
     months: Object.values(buckets).sort((a, b) => b.key.localeCompare(a.key)),
+    incomesByMonth,
   };
 }
 
@@ -176,6 +209,72 @@ export async function updateExpense(arg1, arg2, arg3) {
 export async function deleteExpense(arg1, arg2) {
   const id = arg2 !== undefined ? arg2 : arg1;
   return callLedger('deleteExpense', { id });
+}
+
+// ---------------------------------------------------------------------------
+// Writes: incomes
+//
+// Income has no category — `budgets` is an envelope table and a monthly limit
+// means nothing for money arriving — so these three carry a `source` instead of
+// a `categoryId` and the amount is never checked against any cap.
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates an income form.
+ *
+ * `source` is optional, and an all-whitespace one is treated as absent rather
+ * than as an error: the label is optional by design, and a user who typed a
+ * space and then thought better should not be told they did something wrong.
+ */
+export function validateIncome({ description, amount, source, receivedOn }) {
+  const errors = {};
+  const name = String(description ?? '').trim();
+
+  if (!name) {
+    errors.description = 'Isi nama pemasukan.';
+  } else if (name.length > 80) {
+    errors.description = 'Maksimal 80 karakter.';
+  }
+
+  const raw = String(amount ?? '').trim();
+  if (!raw) {
+    errors.amount = 'Isi nominal pemasukan.';
+  } else if (!/^\d+$/.test(raw)) {
+    errors.amount = 'Nominal harus angka bulat tanpa tanda baca.';
+  } else if (toNumber(raw) <= 0) {
+    errors.amount = 'Nominal harus lebih besar dari nol.';
+  } else if (toNumber(raw) > 1_000_000_000_000) {
+    errors.amount = 'Nominal terlalu besar.';
+  }
+
+  const cleanSource = String(source ?? '').trim();
+  if (cleanSource.length > 40) {
+    errors.source = 'Maksimal 40 karakter.';
+  }
+
+  if (!receivedOn) {
+    errors.receivedOn = 'Pilih tanggal.';
+  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedOn) || Number.isNaN(new Date(receivedOn).getTime())) {
+    errors.receivedOn = 'Tanggal tidak valid.';
+  }
+
+  return errors;
+}
+
+export async function createIncome(arg1, arg2) {
+  const input = arg2 !== undefined ? arg2 : arg1;
+  return callLedger('createIncome', { input });
+}
+
+export async function updateIncome(arg1, arg2, arg3) {
+  const id = arg3 !== undefined ? arg2 : arg1;
+  const input = arg3 !== undefined ? arg3 : arg2;
+  return callLedger('updateIncome', { id, input });
+}
+
+export async function deleteIncome(arg1, arg2) {
+  const id = arg2 !== undefined ? arg2 : arg1;
+  return callLedger('deleteIncome', { id });
 }
 
 // ---------------------------------------------------------------------------

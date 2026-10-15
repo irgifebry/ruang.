@@ -206,3 +206,95 @@ export function spendByMonth(expenses = [], month, count = 6) {
 
   return keys.map((key) => ({ key, label: shortMonthLabel(key), value: totals.get(key) }));
 }
+
+/**
+ * Money in and money out per month, oldest first — the cashflow chart's series.
+ *
+ * `inflow` is the salary for the month plus every income row dated in it. The
+ * salary is part of the same series on purpose: it is income, it is what the
+ * month was funded by, and a chart whose "Masuk" row read Rp 0 for every month
+ * except the ones the user happened to record a THR in would be answering a
+ * question nobody asked. `salary` and `extra` are also returned separately, so
+ * a caller can label which part of a month's inflow was not the salary.
+ *
+ * The window is fixed at `count` months ending at `month`, for the same reason
+ * `spendByMonth` fixes it: a bar row that loses a column when an old month is
+ * deleted rescales everything around it.
+ *
+ * Months with no activity are kept as zeroes rather than dropped. An absent
+ * month and a month with nothing in it look identical on a bar chart, and only
+ * one of them means "the user did nothing".
+ */
+export function cashflowByMonth(incomes = [], expenses = [], salaryRecords = [], month, count = 6) {
+  const total = Math.max(0, Math.trunc(toNumber(count)));
+  if (!total || !month) return [];
+
+  const keys = [];
+  for (let offset = total - 1; offset >= 0; offset -= 1) keys.push(shiftMonth(month, -offset));
+
+  const inWindow = new Set(keys);
+  const extraByMonth = new Map(keys.map((key) => [key, 0]));
+  const spendByMonthKey = new Map(keys.map((key) => [key, 0]));
+
+  // `salaryRecords` arrives either as the ledger's `{ key, amount }` rows or as
+  // the raw `{ month, salary }` rows the history page has. Both shapes are read
+  // here so the caller never has to reshape before charting.
+  const salaryByMonth = new Map();
+  for (const record of Array.isArray(salaryRecords) ? salaryRecords : []) {
+    const key = typeof record?.key === 'string' ? record.key : monthKey(record?.month);
+    if (!key) continue;
+    salaryByMonth.set(key, toPositive(record?.amount ?? record?.salary));
+  }
+
+  for (const income of Array.isArray(incomes) ? incomes : []) {
+    const date = toDate(income?.received_on);
+    if (!date) continue;
+    const key = monthKey(date);
+    if (inWindow.has(key)) extraByMonth.set(key, extraByMonth.get(key) + toPositive(income.amount));
+  }
+
+  for (const expense of Array.isArray(expenses) ? expenses : []) {
+    const date = toDate(expense?.spent_on);
+    if (!date) continue;
+    const key = monthKey(date);
+    if (inWindow.has(key)) spendByMonthKey.set(key, spendByMonthKey.get(key) + toPositive(expense.amount));
+  }
+
+  return keys.map((key) => {
+    const salary = salaryByMonth.get(key) ?? 0;
+    const extra = extraByMonth.get(key);
+    const outflow = spendByMonthKey.get(key);
+    const inflow = salary + extra;
+
+    return {
+      key,
+      label: shortMonthLabel(key),
+      salary,
+      extra,
+      inflow,
+      outflow,
+      net: inflow - outflow,
+    };
+  });
+}
+
+/**
+ * The largest single bar in a cashflow series, which is what both rows in a
+ * month are scaled against.
+ *
+ * Income and spending share one scale rather than each having their own. Two
+ * independent scales would make a month where spending doubled look identical
+ * to one where nothing changed — the comparison the chart exists to support is
+ * between the two bars of the same month, and that only reads if a bar of the
+ * same length means the same rupiah everywhere.
+ *
+ * Returns 0 for an empty or all-zero series, which the chart reads as "nothing
+ * to draw" rather than as a division by zero.
+ */
+export function cashflowPeak(series = []) {
+  const rows = Array.isArray(series) ? series : [];
+  return rows.reduce(
+    (peak, row) => Math.max(peak, toPositive(row?.inflow), toPositive(row?.outflow)),
+    0,
+  );
+}

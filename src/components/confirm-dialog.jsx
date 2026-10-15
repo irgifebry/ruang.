@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { Button, GhostButton } from './form';
 import { DangerCircleIcon } from './icons';
 
@@ -111,14 +112,7 @@ export function ConfirmDialog({
   // The page behind must not scroll while the dialog is up. This keys off
   // `mounted`, not `open`, so the scrollbar does not snap back while the panel
   // is still fading out over the top of it.
-  useEffect(() => {
-    if (!mounted) return undefined;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [mounted]);
+  useScrollLock(mounted);
 
   if (!mounted) return null;
 

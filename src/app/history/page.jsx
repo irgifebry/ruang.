@@ -20,6 +20,8 @@ const loadHistory = async (supabase) => {
     fetchSalaryHistory(supabase, MONTHS_WINDOW),
     fetchMonthlyBreakdown(supabase, MONTHS_WINDOW),
   ]);
+  // `breakdown` carries `incomesByMonth` through untouched; it is spread here
+  // so `buildHistoryRows` receives the same key it reads on a full fetch.
   return { salaryRows, ...breakdown };
 };
 
@@ -68,7 +70,7 @@ export default function HistoryPage() {
               label="Total tersisa"
               value={formatIDRCompact(totalSaved)}
               tone={totalSaved < 0 ? 'danger' : 'default'}
-              sub={totalSaved < 0 ? 'Pengeluaran melebihi gaji' : 'Gaji dikurangi pengeluaran'}
+              sub={totalSaved < 0 ? 'Pengeluaran melebihi pemasukan' : 'Pemasukan dikurangi pengeluaran'}
             />
             <SummaryCard
               index={2}
@@ -111,7 +113,7 @@ export default function HistoryPage() {
                       <div className="h-[5px] bg-ruang-track rounded-[2px] overflow-hidden">
                         <span
                           className={`bar-grow block h-full ${row.saved < 0 ? 'bg-ruang-danger' : 'bg-ruang-accent'}`}
-                          style={{ width: `${ratioPercent(row.spent, row.salary)}%` }}
+                          style={{ width: `${ratioPercent(row.spent, row.inflow)}%` }}
                         />
                       </div>
                       {/* Four facts, two lines. They were three spans in one `flex-wrap` plus a
@@ -126,21 +128,40 @@ export default function HistoryPage() {
                       <div className="mt-[13px] grid grid-cols-2 gap-x-[16px]">
                         <div className="min-w-0">
                           <small className="block font-mono text-[10px] uppercase tracking-[0.09em] text-ruang-subtle mb-[5px]">
-                            Gaji
+                            {/* "Masuk" rather than "Gaji": the figure is the
+                                month's whole inflow, so a month with a bonus in
+                                it shows more than the salary. The breakdown
+                                underneath says so rather than leaving the label
+                                to be read literally. */}
+                            Masuk
                           </small>
                           <strong className="block text-[13px] font-medium tracking-[-0.02em] text-ruang-ink truncate">
-                            {formatIDR(row.salary)}
+                            {formatIDR(row.inflow)}
                           </strong>
                         </div>
                         <div className="min-w-0">
                           <small className="block font-mono text-[10px] uppercase tracking-[0.09em] text-ruang-subtle mb-[5px]">
-                            Keluar · {Math.round((row.spent / row.salary) * 100)}% gaji
+                            Keluar · {Math.round((row.spent / row.inflow) * 100)}% masuk
                           </small>
                           <strong className="block text-[13px] font-medium tracking-[-0.02em] text-ruang-ink truncate">
                             {formatIDR(row.spent)}
                           </strong>
                         </div>
                       </div>
+
+                      {/* Only the months that actually have income rows, so a
+                          normal month does not gain a line saying there was
+                          none. */}
+                      {row.income > 0 && (
+                        <div className="mt-[8px] text-[12px] text-ruang-muted leading-[1.5]">
+                          Termasuk pemasukan lain{' '}
+                          <span className="font-mono text-ruang-ink">{formatIDR(row.income)}</span>
+                          <span className="text-ruang-subtle">
+                            {' '}
+                            dari {row.incomeCount} catatan
+                          </span>
+                        </div>
+                      )}
 
                       <div className="mt-[10px] flex items-baseline gap-x-[10px] text-[12px] leading-[1.5]">
                         <span className="text-ruang-subtle flex-none">{row.count} transaksi</span>
@@ -162,8 +183,8 @@ export default function HistoryPage() {
               </ul>
 
               <p className="mt-[18px] pt-[14px] border-t border-ruang-line text-ruang-subtle text-[12px] leading-[1.65]">
-                Bar menunjukkan porsi gaji yang terpakai. Bar penuh berarti pengeluaran mencapai atau
-                melebihi gaji; merah berarti pengeluaran melampaui gaji.
+                Bar menunjukkan porsi pemasukan yang terpakai. Bar penuh berarti pengeluaran mencapai atau
+                melebihi pemasukan; merah berarti pengeluaran melampaui pemasukan.
               </p>
             </Panel>
           </section>
@@ -175,7 +196,7 @@ export default function HistoryPage() {
         <p className="text-[13px] text-ruang-muted leading-[1.65]">
           Riwayat dihitung dari transaksi yang tersimpan di akunmu. Sebuah bulan masuk riwayat setelah kamu
           menyimpan gaji untuk bulan itu, jadi menaikkan gaji bulan ini tidak mengubah angka bulan-bulan
-          sebelumnya.
+          sebelumnya. Pemasukan di luar gaji ikut dihitung sebagai bagian dari dana yang masuk pada bulan itu.
         </p>
       </div>
     </div>

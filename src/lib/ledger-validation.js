@@ -28,6 +28,23 @@ export function validExpense(input) {
     input.description.trim().length <= 80 && validAmount(input.amount) && validDate(input.spentOn);
 }
 
+/**
+ * An income row. No category, because `budgets` is an envelope table and
+ * nothing about a monthly limit applies to money coming in.
+ *
+ * `source` is the one optional field in the whole ledger, so it is the one that
+ * has to be checked in both directions: `undefined` means "the form never
+ * offered it", but a number, an object or a 41-character string is the client
+ * sending something the row cannot store.
+ */
+export function validIncome(input) {
+  if (!isRecord(input)) return false;
+  const sourceOk = input.source === undefined || input.source === null ||
+    (typeof input.source === 'string' && input.source.trim().length <= 40);
+  return sourceOk && typeof input.description === 'string' && input.description.trim().length > 0 &&
+    input.description.trim().length <= 80 && validAmount(input.amount) && validDate(input.receivedOn);
+}
+
 export function validBudget(input) {
   return isRecord(input) && typeof input.name === 'string' &&
     input.name.trim().length > 0 && input.name.trim().length <= 60 &&

@@ -23,6 +23,7 @@ import { formatIDR, getBudgetSummary } from '../src/lib/money.js';
 
 const {
   ExpenseList,
+  ExpenseRow,
   CategoryRow,
 } = await import('../src/components/expense-row.jsx');
 
@@ -38,9 +39,9 @@ const { ConfirmDialog } = await import('../src/components/confirm-dialog.jsx');
 
 const { Toast } = await import('../src/components/toast.jsx');
 
-const { AllocationDonut, SpendChart } = await import('../src/components/charts.jsx');
+const { AllocationDonut, CashflowChart, SpendChart } = await import('../src/components/charts.jsx');
 
-const { spendByDay, spendByMonth } = await import('../src/lib/charts.js');
+const { spendByDay, spendByMonth, cashflowByMonth } = await import('../src/lib/charts.js');
 
 const budgets = [
   { id: 'food', name: 'Makan & minum', monthly_limit: 1_000_000, color: 'lime' },
@@ -486,4 +487,162 @@ test('SpendChart labels a monthly series by month, not by number', () => {
 
   assert.match(html, /2026-08/);
   assert.match(html, /2026-10/);
+});
+
+// ---------------------------------------------------------------------------
+// Income rows and the cashflow chart
+// ---------------------------------------------------------------------------
+
+test('ExpenseList signs and labels an income row differently from an expense', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ExpenseList, {
+      expenses: [{ id: 'i1', description: 'THR', amount: 1_500_000, received_on: '2026-10-07', source: 'THR' }],
+      kind: 'income',
+    }),
+  );
+
+  // The sign, the accent colour and the source label: all three, because a row
+  // that differed only in colour would not survive a monochrome screen or a
+  // colour-blind reader.
+  assert.match(html, /\+Rp\s1\.500\.000/);
+  assert.match(html, /text-ruang-accent-text/);
+  assert.match(html, /THR/);
+  assert.match(html, /7 Oktober 2026/);
+  assert.doesNotMatch(html, /−/);
+});
+
+test('ExpenseList falls back to a generic label when an income has no source', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ExpenseList, {
+      expenses: [{ id: 'i1', description: 'Kembalian', amount: 250_000, received_on: '2026-10-07', source: null }],
+      kind: 'income',
+    }),
+  );
+
+  // `source` is optional, so the blank must not render as an empty meta line.
+  assert.match(html, /Pemasukan/);
+  assert.match(html, /Kembalian/);
+});
+
+test('ExpenseList keeps an expense negative and coloured as ink', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ExpenseList, {
+      expenses: [{ id: '1', description: 'Belanja', amount: 385_000, spent_on: '2026-10-07', category_id: 'food' }],
+      budgets,
+    }),
+  );
+
+  assert.match(html, /−Rp\s385\.000/);
+  assert.match(html, /Makan &amp; minum/);
+});
+
+test('ExpenseList sorts a mixed list by each row own kind', () => {
+  // The dashboard's "Terbaru" holds both sides with no list-level `kind`, so a
+  // row has to be able to declare its own without the list guessing.
+  const html = renderToStaticMarkup(
+    React.createElement(ExpenseList, {
+      expenses: [
+        { id: 'e1', description: 'Belanja', amount: 100_000, spent_on: '2026-10-07', category_id: 'food', direction: 'expense' },
+        { id: 'i1', description: 'Bonus proyek', amount: 900_000, received_on: '2026-10-08', source: 'Bonus', direction: 'income' },
+      ],
+    }),
+  );
+
+  assert.match(html, /\+Rp\s900\.000/);
+  assert.match(html, /−Rp\s100\.000/);
+});
+
+test('ExpenseList treats a row with no kind and no direction as an expense', () => {
+  // An old caller that passes plain expense rows and no `kind` must keep the
+  // rendering it had: defaulting the *list* to one kind is what would break a
+  // mixed list, so the default lives on the row instead.
+  const html = renderToStaticMarkup(
+    React.createElement(ExpenseList, {
+      expenses: [{ id: '1', description: 'Belanja', amount: 385_000, spent_on: '2026-10-07', category_id: 'food' }],
+    }),
+  );
+
+  assert.match(html, /−Rp\s385\.000/);
+  // The *amount* stays ink. The chip is accent in both kinds — it is the
+  // category's own colour, and the lime chip happens to be accent-coloured.
+  assert.match(html, /class="hidden sm:block font-mono text-\[13px\] text-ruang-ink/);
+});
+
+test('ExpenseRow on an income with a very large amount keeps it on one line', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(ExpenseRow, {
+      expense: { id: 'i1', description: 'THR', amount: 9_876_543_210, received_on: '2026-10-07', source: 'THR' },
+      kind: 'income',
+    }),
+  );
+
+  assert.match(html, /whitespace-nowrap/);
+  assert.match(html, /9\.876\.543\.210/);
+});
+
+const flowSeries = cashflowByMonth(
+  [{ received_on: '2026-09-20', amount: 1_000_000 }],
+  [{ spent_on: '2026-10-05', amount: 2_000_000 }],
+  [{ key: '2026-09', amount: 5_000_000 }, { key: '2026-10', amount: 5_000_000 }],
+  '2026-10',
+  2,
+);
+
+test('CashflowChart prices both bars and the net for every month', () => {
+  const html = renderToStaticMarkup(React.createElement(CashflowChart, { series: flowSeries, months: 2 }));
+
+  // September: 5.000.000 salary + 1.000.000 THR in, nothing out → +6.000.000.
+  assert.match(html, /Sep/);
+  assert.match(html, /\+Rp\s6\.000\.000/);
+  // October: 5.000.000 in, 2.000.000 out → +3.000.000.
+  assert.match(html, /Okt/);
+  assert.match(html, /\+Rp\s3\.000\.000/);
+});
+
+test('CashflowChart gives every row its numbers in text, not only as bars', () => {
+  const html = renderToStaticMarkup(React.createElement(CashflowChart, { series: flowSeries, months: 2 }));
+
+  assert.match(html, /Sep: masuk Rp\s6\.000\.000, keluar Rp\s0/);
+  assert.match(html, /Okt: masuk Rp\s5\.000\.000, keluar Rp\s2\.000\.000/);
+  // The two totals in the footer, so the legend is not the only place the sums
+  // appear.
+  assert.match(html, /Masuk[\s\S]*?Rp\s11\.000\.000/);
+  assert.match(html, /Keluar[\s\S]*?Rp\s2\.000\.000/);
+});
+
+test('CashflowChart scales both rows against the same peak', () => {
+  const html = renderToStaticMarkup(React.createElement(CashflowChart, { series: flowSeries, months: 2 }));
+
+  // The largest bar in the series is September's inflow (6.000.000), so that bar
+  // must be full width and October's must be 5/6 of it — one scale, so the two
+  // bars of a month can be compared against each other.
+  const widths = [...html.matchAll(/width:\s*([\d.]+)%/g)].map((match) => Number(match[1]));
+  assert.ok(widths.includes(100));
+  assert.ok(widths.includes(0));
+  assert.ok(
+    widths.some((width) => Math.abs(width - (5_000_000 / 6_000_000) * 100) < 0.01),
+    `expected a bar at ${(5_000_000 / 6_000_000) * 100}%, saw ${widths.join(', ')}`,
+  );
+});
+
+test('CashflowChart renders the empty state rather than an all-zero chart', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(CashflowChart, { series: cashflowByMonth([], [], [], '2026-10', 6), emptyLabel: 'Belum ada.' }),
+  );
+
+  // Six rows of "Rp 0" reads as a broken chart rather than an unused account.
+  assert.match(html, /Belum ada\./);
+  assert.doesNotMatch(html, /<li/);
+});
+
+test('CashflowChart marks a negative month in words as well as colour', () => {
+  const html = renderToStaticMarkup(
+    React.createElement(CashflowChart, {
+      series: [{ key: '2026-10', label: 'Okt', salary: 1_000_000, extra: 0, inflow: 1_000_000, outflow: 4_000_000, net: -3_000_000 }],
+      months: 1,
+    }),
+  );
+
+  assert.match(html, /−Rp\s3\.000\.000/);
+  assert.match(html, /text-ruang-danger/);
 });

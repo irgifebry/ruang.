@@ -1,20 +1,21 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLedgerData } from '@/hooks/useLedgerData';
 import { fetchLedger } from '@/lib/ledger';
-import { spendByDay, spendByMonth } from '@/lib/charts';
+import { cashflowByMonth, spendByDay, spendByMonth } from '@/lib/charts';
 import {
   balanceLevel,
   currentMonthKey,
   formatIDR,
+  formatIDRCompact,
   formatMonthLabel,
-  getBudgetSummary,
+  getCashflowSummary,
   monthKey,
   ratioPercent,
 } from '@/lib/money';
-import { AllocationDonut, SpendChart } from '@/components/charts';
+import { AllocationDonut, CashflowChart, SpendChart } from '@/components/charts';
 import { CategoryRow, ExpenseList } from '@/components/expense-row';
 import { ArrowRightUpIcon, CheckIcon, CircleDotIcon, DangerCircleIcon } from '@/components/icons';
 import { EmptyState, ErrorState, Eyebrow, LoadingState, Panel } from '@/components/ui';
@@ -31,7 +32,7 @@ export default function Dashboard() {
 
 /** Split out so the header and cards only re-render when data actually changes. */
 function DashboardContent({ data }) {
-  const { salary, budgets, expenses } = data;
+  const { salary, budgets, expenses, incomes = [], salaryRecords = [] } = data;
   const month = currentMonthKey();
   const [granularity, setGranularity] = useState('day');
 
@@ -39,21 +40,42 @@ function DashboardContent({ data }) {
   // page summed every expense the user had ever entered, so an entry from
   // March still moved the "sisa uang bulan ini" figure in October.
   const monthExpenses = expenses.filter((expense) => monthKey(expense.spent_on) === month);
-  const summary = getBudgetSummary(salary, budgets, monthExpenses);
+  const monthIncomes = incomes.filter((income) => monthKey(income.received_on) === month);
+  const summary = getCashflowSummary(salary, monthIncomes, budgets, monthExpenses);
 
-  const recent = [...monthExpenses].slice(0, 6);
-  const remainingPercent = ratioPercent(summary.remaining, summary.salary);
+  // "Terbaru" mixes both sides of the ledger, newest first. Each row carries its
+  // own `direction`, so a bonus is signed, coloured and labelled as income
+  // wherever it lands, and showing it next to the spending it paid for is more
+  // use than a list of expenses that silently ignores the money that arrived.
+  const recent = useMemo(
+    () =>
+      [
+        ...monthExpenses.map((expense) => ({ ...expense, direction: 'expense' })),
+        ...monthIncomes.map((income) => ({ ...income, direction: 'income' })),
+      ]
+        // Newest by date first. `created_at` is not compared: two entries on the
+        // same day would then sort by an ISO timestamp the browser cannot read
+        // consistently, and the row order would differ between renders.
+        .sort((a, b) => (b.received_on ?? b.spent_on ?? '').localeCompare(a.received_on ?? a.spent_on ?? ''))
+        .slice(0, 6),
+    [monthExpenses, monthIncomes],
+  );
+
+  const remainingPercent = ratioPercent(summary.remaining, summary.inflow);
   const isOver = summary.remaining < 0;
   const unallocated = summary.unallocated;
+  const hasInflow = summary.inflow > 0;
 
   // One severity for the whole balance card, so the figure, the meter fill, the
   // note icon and the note text can never disagree about how the month is going.
-  const level = balanceLevel(summary.remaining, summary.salary);
+  // Measured against the month's whole inflow, not the salary: a bonus that has
+  // not been spent yet is not a shortage.
+  const level = balanceLevel(summary.remaining, summary.inflow);
   const isLow = level === 'low' || level === 'empty';
 
-  // An unset salary is an empty state, not a verdict — it stays neutral rather
+  // An empty month is an empty state, not a verdict — it stays neutral rather
   // than borrowing the amber that means "you are nearly out of money".
-  const figureTone = summary.salary === 0 ? '' : level === 'over' ? 'text-ruang-danger' : isLow ? 'text-ruang-warn-text' : '';
+  const figureTone = !hasInflow ? '' : level === 'over' ? 'text-ruang-danger' : isLow ? 'text-ruang-warn-text' : '';
   const meterTone = level === 'over' ? 'bg-ruang-danger' : isLow ? 'bg-ruang-warn' : 'bg-ruang-accent';
 
   // The donut shows the *plan* — each category's monthly limit — because the
@@ -79,6 +101,14 @@ function DashboardContent({ data }) {
     granularity === 'day'
       ? (point) => `Tanggal ${point.label}`
       : (point) => (point.key ? formatMonthLabel(point.key) : point.label);
+
+  // The cashflow chart reaches back over the whole history rather than the
+  // current month: a single month has nothing to compare its inflow against,
+  // and salary is only known for months the user actually saved it.
+  const cashflowSeries = useMemo(
+    () => cashflowByMonth(incomes, expenses, salaryRecords, month, 6),
+    [incomes, expenses, salaryRecords, month],
+  );
 
   return (
     <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
@@ -137,9 +167,22 @@ function DashboardContent({ data }) {
               {/* Below `sm` this takes a full row instead of sitting beside the
                   figure: at balance sizes it still fits, and `items-baseline`
                   then drops it onto the bottom edge of the number, where it reads
-                  as part of the figure and crowds the meter below. */}
+                  as part of the figure and crowds the meter below.
+
+                  "dari pemasukan" rather than "dari gaji": the balance is measured
+                  against the whole inflow, so naming only the salary would
+                  understate it by exactly the amount in the second line. */}
               <div className="basis-full sm:basis-auto text-[13px] leading-[1.6] text-ruang-muted">
-                dari gaji <strong className="text-ruang-ink font-medium ml-[4px]">{formatIDR(summary.salary)}</strong>
+                dari pemasukan{' '}
+                <strong className="text-ruang-ink font-medium ml-[4px]">{formatIDR(summary.inflow)}</strong>
+                {summary.income > 0 && (
+                  <>
+                    {' '}
+                    <span className="text-ruang-subtle">
+                      (gaji {formatIDRCompact(summary.salary)} · lain {formatIDRCompact(summary.income)})
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -151,7 +194,7 @@ function DashboardContent({ data }) {
               aria-valuenow={Math.round(remainingPercent)}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Persentase sisa uang"
+              aria-label="Persentase sisa uang dari pemasukan bulan ini"
             >
               <span
                 className={`bar-grow block h-full ${meterTone}`}
@@ -174,24 +217,24 @@ function DashboardContent({ data }) {
                 <>
                   <DangerCircleIcon size={16} className="flex-none text-ruang-danger mt-[2px]" aria-hidden="true" />
                   <p className="text-ruang-danger">
-                    Melebihi gaji {formatIDR(Math.abs(summary.remaining))}.
+                    Melebihi pemasukan {formatIDR(Math.abs(summary.remaining))}.
                   </p>
                 </>
-              ) : summary.salary === 0 ? (
+              ) : !hasInflow ? (
                 <>
                   <CircleDotIcon size={16} className="flex-none text-ruang-muted mt-[2px]" aria-hidden="true" />
-                  <p>Gaji belum diatur. Atur gaji di menu Pengaturan.</p>
+                  <p>Belum ada pemasukan bulan ini. Atur gaji di menu Pengaturan.</p>
                 </>
               ) : summary.remaining === 0 ? (
                 <>
                   <CircleDotIcon size={16} className="flex-none text-ruang-warn-text mt-[2px]" aria-hidden="true" />
-                  <p className="text-ruang-warn-text">Seluruh gaji sudah terpakai bulan ini.</p>
+                  <p className="text-ruang-warn-text">Seluruh pemasukan sudah terpakai bulan ini.</p>
                 </>
               ) : level === 'low' ? (
                 <>
                   <CircleDotIcon size={16} className="flex-none text-ruang-warn-text mt-[2px]" aria-hidden="true" />
                   <p className="text-ruang-warn-text">
-                    Tinggal {formatIDR(summary.remaining)} dari {formatIDR(summary.salary)}.
+                    Tinggal {formatIDR(summary.remaining)} dari {formatIDR(summary.inflow)}.
                   </p>
                 </>
               ) : (
@@ -211,7 +254,7 @@ function DashboardContent({ data }) {
             <div className="flex items-center justify-between gap-[10px]">
               <div>
                 <Eyebrow>Anggaran</Eyebrow>
-                <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[8px]">Arus kas</h2>
+                <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[8px]">Alokasi</h2>
               </div>
               <Link
                 href="/settings"
@@ -296,6 +339,18 @@ function DashboardContent({ data }) {
         />
       </section>
 
+      {/* The six-month cashflow sits on its own row rather than in the grid
+          above: the donut and the spend chart are both tall, and a third card
+          beside them would have to be squeezed to about half their width. Its
+          rows are wide and shallow, so it reads better across the full width. */}
+      <section className="mt-section">
+        <CashflowChart
+          series={cashflowSeries}
+          months={6}
+          emptyLabel="Belum ada gaji atau transaksi yang tercatat dalam 6 bulan terakhir."
+        />
+      </section>
+
       <section className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-card mt-section">
         <div className="min-w-0">
           <div className="flex items-center justify-between mb-[17px]">
@@ -345,7 +400,7 @@ function DashboardContent({ data }) {
             expenses={recent}
             budgets={budgets}
             dense
-            emptyLabel={`Belum ada transaksi bulan ${formatMonthLabel(month)}. Catat pengeluaran pertama.`}
+            emptyLabel={`Belum ada transaksi bulan ${formatMonthLabel(month)}. Catat pengeluaran atau pemasukan pertama.`}
           />
         </div>
       </section>

@@ -10,6 +10,7 @@ import {
   validDate,
   validExpense,
   validId,
+  validIncome,
   validMonths,
 } from '@/lib/ledger-validation';
 import {
@@ -114,7 +115,7 @@ export async function POST(request) {
       case 'fetchLedger': {
         const currentMonth = monthStart(new Date());
 
-        const [profileRes, budgetsRes, expensesRes, salaryRes] = await Promise.all([
+        const [profileRes, budgetsRes, expensesRes, salaryRes, incomesRes] = await Promise.all([
           pool.query(PROFILE_SELECT, [userId]),
           pool.query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY created_at ASC', [userId]),
           pool.query(
@@ -140,6 +141,17 @@ export async function POST(request) {
             ORDER BY month DESC`,
             [userId]
           ),
+          // Unpaged, like `expenses`: the transactions screen filters by month
+          // in the browser and a salary that lands on the 28th must not fall
+          // out of the set because it was the newest row in a long history.
+          pool.query(
+            `SELECT id, description, source, amount::numeric,
+              to_char(received_on, 'YYYY-MM-DD') AS received_on, created_at
+            FROM incomes
+            WHERE user_id = $1
+            ORDER BY received_on DESC, created_at DESC`,
+            [userId]
+          ),
         ]);
 
         const profile = profileRes.rows[0] ?? null;
@@ -157,6 +169,14 @@ export async function POST(request) {
           amount: toNumber(r.amount),
           updatedAt: r.updated_at,
         }));
+        const incomes = incomesRes.rows.map((row) => ({
+          ...row,
+          // A blank label is stored as NULL by the API, but an empty string from
+          // an older row would render as an empty meta line rather than falling
+          // back to the generic wording.
+          source: row.source || null,
+          amount: toNumber(row.amount),
+        }));
 
         const currentSalaryRow = salaryRecords.find((r) => r.month === currentMonth);
         const salary = toPositive(currentSalaryRow?.amount ?? profile?.salary);
@@ -171,6 +191,7 @@ export async function POST(request) {
           salary,
           budgets,
           expenses,
+          incomes,
           salaryRecords: series,
         });
       }
@@ -201,7 +222,7 @@ export async function POST(request) {
         const oldestMonth = shiftMonth(currentMonthKey(), -(months - 1));
         const windowStart = `${oldestMonth}-01`;
 
-        const [budgetsRes, expensesRes] = await Promise.all([
+        const [budgetsRes, expensesRes, incomesRes] = await Promise.all([
           pool.query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY created_at ASC', [userId]),
           pool.query(
             `SELECT 
@@ -217,6 +238,16 @@ export async function POST(request) {
             JOIN budgets b ON e.category_id = b.id
             WHERE e.user_id = $1 AND e.spent_on >= $2
             ORDER BY e.spent_on DESC, e.created_at DESC`,
+            [userId, windowStart]
+          ),
+          // Same window as the expenses, so the two aggregates in a history row
+          // describe the same months rather than two slightly different ranges.
+          pool.query(
+            `SELECT id, description, source, amount::numeric,
+              to_char(received_on, 'YYYY-MM-DD') AS received_on
+            FROM incomes
+            WHERE user_id = $1 AND received_on >= $2
+            ORDER BY received_on DESC, created_at DESC`,
             [userId, windowStart]
           ),
         ]);
@@ -236,7 +267,18 @@ export async function POST(request) {
           });
         }
 
-        return NextResponse.json({ budgets, byMonth });
+        const incomesByMonth = {};
+        for (const income of incomesRes.rows) {
+          const key = monthKey(income.received_on);
+          if (!incomesByMonth[key]) incomesByMonth[key] = [];
+          incomesByMonth[key].push({
+            ...income,
+            source: income.source || null,
+            amount: toNumber(income.amount),
+          });
+        }
+
+        return NextResponse.json({ budgets, byMonth, incomesByMonth });
       }
 
       case 'fetchProfile': {
@@ -278,6 +320,48 @@ export async function POST(request) {
         if (!validId(id)) return errorResponse('ID pengeluaran tidak valid.');
         const result = await pool.query('DELETE FROM expenses WHERE id = $1 AND user_id = $2', [id, userId]);
         if (!result.rowCount) return errorResponse('Pengeluaran tidak ditemukan.', 404);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'createIncome': {
+        const { input } = body;
+        if (!validIncome(input)) return errorResponse('Data pemasukan tidak valid.');
+        const id = crypto.randomUUID();
+        await pool.query(
+          `INSERT INTO incomes (id, user_id, description, source, amount, received_on)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            id,
+            userId,
+            input.description.trim(),
+            // An empty label is stored as NULL so the row never carries a blank
+            // string that would render as an empty meta line.
+            input.source?.trim() || null,
+            input.amount,
+            input.receivedOn,
+          ]
+        );
+        return NextResponse.json({ success: true, id });
+      }
+
+      case 'updateIncome': {
+        const { id, input } = body;
+        if (!validId(id) || !validIncome(input)) return errorResponse('Data pemasukan tidak valid.');
+        const result = await pool.query(
+          `UPDATE incomes
+           SET description = $1, source = $2, amount = $3, received_on = $4
+           WHERE id = $5 AND user_id = $6`,
+          [input.description.trim(), input.source?.trim() || null, input.amount, input.receivedOn, id, userId]
+        );
+        if (!result.rowCount) return errorResponse('Pemasukan tidak ditemukan.', 404);
+        return NextResponse.json({ success: true });
+      }
+
+      case 'deleteIncome': {
+        const { id } = body;
+        if (!validId(id)) return errorResponse('ID pemasukan tidak valid.');
+        const result = await pool.query('DELETE FROM incomes WHERE id = $1 AND user_id = $2', [id, userId]);
+        if (!result.rowCount) return errorResponse('Pemasukan tidak ditemukan.', 404);
         return NextResponse.json({ success: true });
       }
 

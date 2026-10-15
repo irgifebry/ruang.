@@ -51,6 +51,27 @@ export function formatPercent(value) {
 }
 
 /**
+ * `'1250000'` -> `'1.250.000'`, for an amount field the user is typing into.
+ *
+ * A rupiah amount is long enough that a miscounted digit is invisible: typing
+ * `1250000` and `1500000` produce fields that look identical in width and
+ * differ by a factor of 1.2. Grouping the digits as they are typed is what lets
+ * the person check the number against the receipt they are holding.
+ *
+ * Separators are only ever *display*. The value that reaches validation and the
+ * database stays a plain digit string, because `validAmount` and the database
+ * `numeric` column both want one — this must not become a parse step.
+ *
+ * Non-digits are dropped rather than rejected, so a pasted "Rp 12.500" or a
+ * stray space lands as something the validator can judge instead of as text no
+ * rule can match.
+ */
+export function formatDigits(value) {
+  const digits = String(value ?? '').replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+/**
  * Percentage of `value` against `total`, clamped to 0–100 for progress bars.
  * Returns 0 when the total is 0 so an empty budget never renders as full.
  */
@@ -97,14 +118,26 @@ export function balanceLevel(remaining, salary) {
  *
  * Each category comes back with `spent`, `remaining` (may be negative, which is
  * how the UI detects an overspend) and `percent` (clamped, for the bar).
+ *
+ * `remaining` here is against the salary alone, and it stays that way on
+ * purpose: the per-category limits are capped by `validateBudget` against the
+ * salary, so a month that also had a bonus can be over its allocation while
+ * still having money left over. Mixing the two here would report a category as
+ * overspent because of money that never belonged in its envelope. Use
+ * `getCashflowSummary` for the "sisa uang" figure, which is about the account
+ * rather than about the budget.
  */
 export function getBudgetSummary(salary, budgets = [], expenses = []) {
   const safeSalary = toPositive(salary);
-  const safeBudgets = budgets.map((budget) => ({
+  // `Array.isArray` rather than the parameter default: a default only covers
+  // `undefined`, and a page that reads these straight off an API response can
+  // hand over a `null` for a key the server omitted. Everything in this module
+  // degrades to zero rather than throwing.
+  const safeBudgets = (Array.isArray(budgets) ? budgets : []).map((budget) => ({
     ...budget,
     limit: toPositive(budget.monthly_limit ?? budget.limit),
   }));
-  const safeExpenses = expenses.map((expense) => ({
+  const safeExpenses = (Array.isArray(expenses) ? expenses : []).map((expense) => ({
     ...expense,
     amount: toPositive(expense.amount),
   }));
@@ -134,6 +167,41 @@ export function getBudgetSummary(salary, budgets = [], expenses = []) {
     unallocated: safeSalary - allocated,
     categories,
     overBudgetCount: categories.filter((category) => category.over).length,
+  };
+}
+
+/**
+ * One month of money: what came in, what went out, what is left.
+ *
+ * `salary` is the budget base and stays that way. `incomes` is everything else
+ * that arrived — a THR, a bonus — and it is added here rather
+ * than anywhere else, because this is the only figure that means "money the
+ * account actually has". The per-category limits in `getBudgetSummary` are
+ * deliberately left measured against the salary alone: they are envelopes
+ * funded out of the salary, so a bonus that arrives mid-month does not make an
+ * over-budget category suddenly within budget.
+ *
+ * `salary`, `allocated` and `categories` are passed straight through from
+ * `getBudgetSummary` so a caller that needs both reads one object. Only
+ * `remaining` is redefined, because "remaining" here means inflow minus spend
+ * and there it meant salary minus spend.
+ *
+ * `incomes` is optional and defaults to empty, so an account created before
+ * this feature existed produces the same numbers it always did.
+ */
+export function getCashflowSummary(salary, incomes = [], budgets = [], expenses = []) {
+  const base = getBudgetSummary(salary, budgets, expenses);
+  const income = (Array.isArray(incomes) ? incomes : [])
+    .reduce((sum, incomeRow) => sum + toPositive(incomeRow?.amount), 0);
+  const inflow = base.salary + income;
+
+  return {
+    ...base,
+    salary: base.salary,
+    income,
+    inflow,
+    remaining: inflow - base.spent,
+    savedPercent: ratioPercent(inflow - base.spent, inflow),
   };
 }
 

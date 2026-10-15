@@ -1,6 +1,7 @@
 'use client';
 
 import { useId } from 'react';
+import { formatDigits } from '@/lib/money';
 
 /**
  * Form primitives.
@@ -52,7 +53,26 @@ function controlProps(id, error, describedBy) {
   };
 }
 
+/**
+ * An explicit `id` prop wins over the generated one.
+ *
+ * It has to win for *both* the input and the label, which is the whole point:
+ * the generated id is only ever used to tie a label, an input and its error
+ * message together. A caller that passes `id` — to make the field focusable by
+ * `document.getElementById` when validation fails, say — used to override only
+ * the input's id through `...rest`, which left the `<label for>` pointing at an
+ * id nothing had. The field was announced with no name at all.
+ *
+ * `useId` is still called unconditionally so the hook order never changes
+ * between renders.
+ */
+function useFieldId(provided) {
+  const generated = useId();
+  return provided ?? generated;
+}
+
 export function TextField({
+  id: providedId,
   label,
   value,
   onChange,
@@ -66,7 +86,7 @@ export function TextField({
   size,
   ...rest
 }) {
-  const id = useId();
+  const id = useFieldId(providedId);
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
   return (
@@ -96,9 +116,36 @@ export function TextField({
  * feedback at all. As text, the raw value is visible and `validateExpense` can
  * explain what is wrong.
  */
-export function NumberField({ label, value, onChange, error, hint, size, align = 'left', ...rest }) {
-  const id = useId();
+/**
+ * Numeric input.
+ *
+ * Rendered as `type="text"` with `inputMode="numeric"` rather than
+ * `type="number"`: number inputs silently discard invalid keystrokes, so a
+ * pasted "12.500" or a stray "-" never reaches validation and the user gets no
+ * feedback at all. As text, the raw value is visible and `validateExpense` can
+ * explain what is wrong.
+ *
+ * `grouped` renders the value with thousand separators *as it is typed*, for the
+ * case where a miscounted digit would otherwise be invisible: `1250000` and
+ * `1500000` are the same width and differ by a fifth. Grouping is display only —
+ * the value stays a digit string, so `validAmount` and the database both still
+ * receive one thing and nothing has to be parsed back out.
+ */
+export function NumberField({
+  id: providedId,
+  label,
+  value,
+  onChange,
+  error,
+  hint,
+  size,
+  align = 'left',
+  grouped = false,
+  ...rest
+}) {
+  const id = useFieldId(providedId);
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
+  const shown = grouped ? formatDigits(value) : value;
 
   return (
     <Field label={label} error={error} hint={hint} htmlFor={id}>
@@ -113,7 +160,7 @@ export function NumberField({ label, value, onChange, error, hint, size, align =
           type="text"
           inputMode="numeric"
           pattern="[0-9]*"
-          value={value}
+          value={shown}
           onChange={onChange}
           placeholder="0"
           className={`${INPUT_BASE} font-mono ${borderFor(error, size)} ${
@@ -126,8 +173,18 @@ export function NumberField({ label, value, onChange, error, hint, size, align =
   );
 }
 
-export function SelectField({ label, value, onChange, error, hint, options, placeholder, ...rest }) {
-  const id = useId();
+export function SelectField({
+  id: providedId,
+  label,
+  value,
+  onChange,
+  error,
+  hint,
+  options,
+  placeholder,
+  ...rest
+}) {
+  const id = useFieldId(providedId);
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
   return (

@@ -3,21 +3,26 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLedgerData, useMutation } from '@/hooks/useLedgerData';
+import { useScrollLock } from '@/hooks/useScrollLock';
 import { createClient } from '@/lib/client';
 import {
   countExpensesIn,
   createExpense,
+  createIncome,
   deleteBudget,
   deleteExpense,
+  deleteIncome,
   fetchLedger,
   updateExpense,
+  updateIncome,
   validateExpense,
+  validateIncome,
 } from '@/lib/ledger';
 import {
   currentMonthKey,
   formatIDR,
   formatMonthLabel,
-  getBudgetSummary,
+  getCashflowSummary,
   monthKey,
   monthStart,
   todayISO,
@@ -28,7 +33,19 @@ import { ExpenseList } from '@/components/expense-row';
 import { ArrowRightUpIcon, FilterIcon, MagnifierIcon } from '@/components/icons';
 import { EmptyState, ErrorState, Eyebrow, LoadingState, Panel } from '@/components/ui';
 
-const BLANK = { description: '', amount: '', categoryId: '', spentOn: todayISO() };
+const BLANK_EXPENSE = { description: '', amount: '', categoryId: '', spentOn: todayISO() };
+const BLANK_INCOME = { description: '', amount: '', source: '', receivedOn: todayISO() };
+
+/**
+ * The two sides of the ledger.
+ *
+ * `label` is what the list tabs say; the form's own toggle reuses it, so the
+ * two never drift into calling the same thing by different names.
+ */
+const KINDS = [
+  { kind: 'expense', label: 'Pengeluaran' },
+  { kind: 'income', label: 'Pemasukan' },
+];
 
 export default function TransactionsPage() {
   const { data, loading, error, reload } = useLedgerData(fetchLedger);
@@ -41,7 +58,16 @@ export default function TransactionsPage() {
 }
 
 function TransactionsContent({ data, reload }) {
-  const [form, setForm] = useState(BLANK);
+  /* Which list is on screen. Affects only the filters, the totals and the rows —
+     never the form. */
+  const [kind, setKind] = useState('expense');
+
+  /* Which side the open dialog is writing. Separate from `kind` on purpose: the
+     "Catat" button sits in the page header, so tying it to a list tab would make
+     recording a bonus require first switching the whole page over. */
+  const [formKind, setFormKind] = useState('expense');
+  const [form, setForm] = useState(BLANK_EXPENSE);
+  const [incomeForm, setIncomeForm] = useState(BLANK_INCOME);
   const [fieldErrors, setFieldErrors] = useState({});
   const [editing, setEditing] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -63,50 +89,191 @@ function TransactionsContent({ data, reload }) {
     if (!formOpen && dialog.open) dialog.close();
   }, [formOpen]);
 
-  const { budgets, expenses, salary } = data;
+  /**
+   * `showModal()` makes the page inert to input but does not stop it scrolling,
+   * so the background kept moving under the backdrop on a trackpad. The lock
+   * waits for the element itself rather than for `formOpen`: this dialog fades
+   * out over 200ms, and releasing the lock the instant `close()` runs lets the
+   * page scroll while the panel is still visibly sitting on top of it.
+   *
+   * The native `close` event fires after the exit transition has finished, which
+   * is exactly the moment the overlay stops being visible.
+   */
+  const [dialogVisible, setDialogVisible] = useState(false);
+  useScrollLock(dialogVisible);
 
-  /** Every month that has at least one expense, newest first, for the filter. */
+  useEffect(() => {
+    const dialog = formDialog.current;
+    if (!dialog) return undefined;
+
+    if (formOpen) {
+      setDialogVisible(true);
+      return undefined;
+    }
+
+    // Already fully closed — nothing was on screen, so nothing to wait for.
+    if (!dialog.open) {
+      setDialogVisible(false);
+      return undefined;
+    }
+
+    const onClose = () => setDialogVisible(false);
+    dialog.addEventListener('close', onClose);
+    return () => dialog.removeEventListener('close', onClose);
+  }, [formOpen]);
+
+  /**
+   * Put the cursor in the first field when the dialog opens.
+   *
+   * A `<dialog>` shows modal and traps focus, but it does not choose *where*
+   * focus lands — the browser puts it on the dialog itself, so the first thing
+   * an entering user does is click a field. Since the overwhelmingly common
+   * flow is "type a name, type an amount, submit", the dialog opens on the name
+   * field and the whole entry can be done from the keyboard.
+   *
+   * Deferred by one frame because `showModal()` is synchronous and the field is
+   * mounted in the same commit as the class that positions it.
+   */
+  useEffect(() => {
+    if (!formOpen) return;
+    const id = requestAnimationFrame(() => {
+      formDialog.current?.querySelector('input:not([type="hidden"])')?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [formOpen]);
+
+  /**
+   * Enter saves from any field.
+   *
+   * The form already submits on Enter — that is native behaviour, and it works
+   * — but the date input is a `<input type="date">`, where Enter opens the
+   * calendar picker in some browsers and only submits if the picker was already
+   * dismissed. So this closes that hole explicitly rather than relying on the
+   * browser to guess.
+   */
+  const formKeyDown = (event) => {
+    if (event.key === 'Enter' && busy) {
+      // A save already in flight must not be submitted twice; the Button
+      // disables itself visually, but Enter would still reach the form.
+      event.preventDefault();
+    }
+  };
+
+  const { budgets, expenses, incomes = [], salary } = data;
+  const isIncome = kind === 'income';
+
+  /* The form's own kind. Everything below that writes or validates a row reads
+     this one; everything that renders the list reads `isIncome` above. */
+  const formIsIncome = formKind === 'income';
+  const formValue = formIsIncome ? incomeForm : form;
+
+  /**
+   * Every month that has at least one row of the *active* kind, newest first.
+   *
+   * Scoped to the kind on purpose: switching to "Pemasukan" and finding a month
+   * in the picker because an expense happened in it would put the user on a
+   * month whose income list is empty for a reason that has nothing to do with
+   * the month.
+   */
   const monthsWithData = useMemo(() => {
-    const keys = new Set(expenses.map((expense) => monthKey(expense.spent_on)).filter(Boolean));
+    const dates = isIncome ? incomes.map((row) => row.received_on) : expenses.map((row) => row.spent_on);
+    const keys = new Set(dates.map(monthKey).filter(Boolean));
     keys.add(currentMonthKey());
     return [...keys].sort((a, b) => b.localeCompare(a));
-  }, [expenses]);
+  }, [expenses, incomes, isIncome]);
 
-  /** Apply the search box, category and month filters together. */
+  /**
+   * Apply the search box, category and month filters together.
+   *
+   * Income rows carry no category, so the category filter is skipped for them
+   * rather than matching nothing — leaving the control visible but inert would
+   * look like a broken filter rather than an inapplicable one.
+   */
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return expenses.filter((expense) => {
-      if (monthFilter && monthKey(expense.spent_on) !== monthFilter) return false;
-      if (categoryFilter && expense.category_id !== categoryFilter) return false;
-      if (term && !expense.description.toLowerCase().includes(term)) return false;
+    const rows = isIncome ? incomes : expenses;
+    const dateOf = (row) => (isIncome ? row.received_on : row.spent_on);
+
+    return rows.filter((row) => {
+      if (monthFilter && monthKey(dateOf(row)) !== monthFilter) return false;
+      if (!isIncome && categoryFilter && row.category_id !== categoryFilter) return false;
+      if (term && !row.description.toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [expenses, monthFilter, categoryFilter, search]);
+  }, [expenses, incomes, isIncome, monthFilter, categoryFilter, search]);
 
   /** Totals for the rows currently visible, not the whole month. */
-  const visibleTotal = filtered.reduce((sum, expense) => sum + Number(expense.amount ?? 0), 0);
-  const monthExpenses = expenses.filter((expense) => monthKey(expense.spent_on) === monthFilter);
-  const monthSummary = getBudgetSummary(salary, budgets, monthExpenses);
+  const visibleTotal = filtered.reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+
+  /**
+   * The summary card above the list, always scoped to the *current* month.
+   *
+   * It does not follow the active tab, because it answers a question about the
+   * month rather than about the list — switching tabs would otherwise change
+   * "Sisa" to mean a different number each time, which is the one thing a
+   * headline figure must never do.
+   */
+  const monthExpenses = expenses.filter((expense) => monthKey(expense.spent_on) === currentMonthKey());
+  const monthIncomes = incomes.filter((income) => monthKey(income.received_on) === currentMonthKey());
+  const monthSummary = getCashflowSummary(salary, monthIncomes, budgets, monthExpenses);
+
+  /* Writes to the form for whichever kind the dialog is currently showing, so the
+     toggle inside the dialog needs no special handling at the call sites. */
+  const setFormValue = formIsIncome ? setIncomeForm : setForm;
 
   const setField = (name, value) => {
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setFormValue((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
     setSuccess('');
     setMutationError(null);
   };
 
   const resetForm = () => {
-    setForm(BLANK);
+    setForm(BLANK_EXPENSE);
+    setIncomeForm(BLANK_INCOME);
     setFieldErrors({});
     setEditing(null);
     setSuccess('');
     setFormOpen(false);
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  /**
+   * Switching the list tab touches nothing about the form.
+   *
+   * The two live apart now that the form carries its own kind: what is on screen
+   * and what is being typed are separate questions, and a page-level toggle
+   * used to decide both — which meant recording a bonus required first switching
+   * the whole page over to the income tab.
+   */
+  const handleKindChange = (next) => {
+    if (next === kind) return;
+    setKind(next);
+  };
 
-    const errors = validateExpense(form, budgets);
+  /**
+   * The toggle inside the dialog.
+   *
+   * Both shapes are kept in state, so switching mid-form loses nothing: whatever
+   * was half-typed on the other side is still there when you switch back. The
+   * errors are dropped, because "Kategori belum dipilih" belongs to the form you
+   * just left and would otherwise greet you on the other side.
+   *
+   * Hidden while editing: the row being edited is already one specific kind, and
+   * offering to convert an expense into an income by flipping a switch would be
+   * a delete and a create wearing one control's clothes.
+   */
+  const handleFormKindChange = (next) => {
+    if (next === formKind || editing) return;
+    setFormKind(next);
+    setFieldErrors({});
+    setMutationError(null);
+    setSuccess('');
+  };
+
+  const handleSubmit = async (event, { keepOpen = false } = {}) => {
+    event?.preventDefault();
+
+    const errors = formIsIncome ? validateIncome(incomeForm) : validateExpense(form, budgets);
     setFieldErrors(errors);
     setSuccess('');
     setMutationError(null);
@@ -114,7 +281,10 @@ function TransactionsContent({ data, reload }) {
     // Stop on the first invalid field and move focus to it, so the user is not
     // left guessing which of four inputs the message refers to.
     if (Object.keys(errors).length) {
-      const first = ['description', 'amount', 'categoryId', 'spentOn'].find((key) => errors[key]);
+      const first = (formIsIncome
+        ? ['description', 'amount', 'source', 'receivedOn']
+        : ['description', 'amount', 'categoryId', 'spentOn']
+      ).find((key) => errors[key]);
       document.getElementById(`field-${first}`)?.focus();
       return;
     }
@@ -125,19 +295,26 @@ function TransactionsContent({ data, reload }) {
       return;
     }
     const accountCreationDate = monthStart(data.profile.created_at);
-    const expenseMonthDate = monthStart(form.spentOn);
-    if (expenseMonthDate < accountCreationDate) {
+    const dateKey = formIsIncome ? 'receivedOn' : 'spentOn';
+    const rowMonthDate = monthStart(formValue[dateKey]);
+    if (rowMonthDate < accountCreationDate) {
       const accountMonthLabel = formatMonthLabel(accountCreationDate);
       setFieldErrors((prev) => ({
         ...prev,
-        spentOn: `Tanggal harus berada pada bulan pembuatan akun (${accountMonthLabel}) atau setelahnya.`,
+        [dateKey]: `Tanggal harus berada pada bulan pembuatan akun (${accountMonthLabel}) atau setelahnya.`,
       }));
-      document.getElementById('field-spentOn')?.focus();
+      document.getElementById(`field-${dateKey}`)?.focus();
       return;
     }
 
     const ok = await run(async () => {
-      if (editing) {
+      if (formIsIncome) {
+        if (editing) {
+          await updateIncome(supabase, editing.id, incomeForm);
+        } else {
+          await createIncome(supabase, incomeForm);
+        }
+      } else if (editing) {
         await updateExpense(supabase, editing.id, form);
       } else {
         await createExpense(supabase, form);
@@ -145,36 +322,84 @@ function TransactionsContent({ data, reload }) {
     });
 
     if (ok) {
+      reload();
+
+      if (keepOpen && !editing) {
+        /* Entering several transactions in a row is the normal case — a shopping
+           trip produces three or four lines, not one — so this clears only the
+           fields that differ per row and keeps the one that does not. The
+           category is the field worth keeping: three of four entries at a
+           supermarket are the same envelope, and re-picking it four times is the
+           part of this form that gets old. */
+        const blank = formIsIncome ? BLANK_INCOME : BLANK_EXPENSE;
+        const kept = formIsIncome
+          ? { receivedOn: incomeForm.receivedOn }
+          : { categoryId: form.categoryId, spentOn: form.spentOn };
+
+        setFormValue({ ...blank, ...kept });
+        setFieldErrors({});
+        setSuccess('Tersimpan. Lanjut catat yang berikutnya.');
+        return;
+      }
+
       setSuccess(editing ? 'Transaksi diperbarui.' : 'Transaksi tersimpan.');
       resetForm();
-      reload();
     }
   };
 
-  const handleEdit = (expense) => {
-    setEditing(expense);
-    setSuccess('');
-    setMutationError(null);
-    setFieldErrors({});
-    setForm({
-      description: expense.description,
-      amount: String(expense.amount),
-      categoryId: expense.category_id,
-      spentOn: expense.spent_on,
-    });
+  /** Opens the dialog on the given kind. `resetForm` first, so a new entry never
+      inherits the last one's values. */
+  const openForm = (which) => {
+    resetForm();
+    setFormKind(which);
     setFormOpen(true);
   };
 
-  const handleDelete = (expense) =>
+  const handleEdit = (row) => {
+    setEditing(row);
+    setSuccess('');
+    setMutationError(null);
+    setFieldErrors({});
+
+    /* The dialog follows the row, not the tab. Editing an income while the
+       "Pengeluaran" tab happens to be selected is not a state anyone should be
+       able to reach by accident, and the toggle is hidden while editing anyway. */
+    const editingIncome = row.received_on !== undefined;
+    setFormKind(editingIncome ? 'income' : 'expense');
+
+    if (editingIncome) {
+      setIncomeForm({
+        description: row.description,
+        amount: String(row.amount),
+        source: row.source ?? '',
+        receivedOn: row.received_on,
+      });
+    } else {
+      setForm({
+        description: row.description,
+        amount: String(row.amount),
+        categoryId: row.category_id,
+        spentOn: row.spent_on,
+      });
+    }
+    setFormOpen(true);
+  };
+
+  const handleDelete = (row) =>
     confirm({
       title: 'Hapus transaksi ini?',
-      description: `"${expense.description}" sebesar ${formatIDR(expense.amount)} akan dihapus permanen.\n\nTindakan ini tidak bisa dibatalkan.`,
+      description: `"${row.description}" sebesar ${formatIDR(row.amount)} akan dihapus permanen.\n\nTindakan ini tidak bisa dibatalkan.`,
       confirmLabel: 'Hapus transaksi',
       onConfirm: async () => {
-        const done = await run(() => deleteExpense(supabase, expense.id));
+        /* Read off the row, not the active tab. A delete button lives in the list, so
+           the list's tab is right today — but asking the row which table it came
+           from means a tab change can never send this at the wrong endpoint. */
+        const done = await run(() =>
+          row.received_on !== undefined ? deleteIncome(supabase, row.id) : deleteExpense(supabase, row.id),
+        );
         if (!done) return false;
 
-        if (editing?.id === expense.id) resetForm();
+        if (editing?.id === row.id) resetForm();
         setSuccess('Transaksi dihapus.');
         reload();
         return true;
@@ -208,8 +433,11 @@ function TransactionsContent({ data, reload }) {
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.05em] leading-[1.12] font-medium">
           Transaksi
         </h1>
-        <Button onClick={() => { resetForm(); setFormOpen(true); }} className="flex-none mb-[4px]">
-          Catat pengeluaran
+        {/* One button, not two. Which kind is being recorded is a question about
+            the transaction, not about what the list below happens to be showing,
+            so it is answered inside the dialog where the rest of the form is. */}
+        <Button onClick={() => openForm('expense')} className="flex-none mb-[4px]">
+          Catat transaksi
           <ArrowRightUpIcon size={15} aria-hidden="true" />
         </Button>
       </header>
@@ -225,8 +453,17 @@ function TransactionsContent({ data, reload }) {
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-card">
-          <Stat label="Gaji" value={formatIDR(salary)} />
+        {/* Four figures rather than three: "Gaji" alone stopped being the whole
+            inflow the moment income could be recorded, so it is joined by " lain"
+            and the two add up to the number "Sisa" is measured against. */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-card">
+          <Stat label="Gaji" value={formatIDR(monthSummary.salary)} />
+          <Stat
+            label="Masuk lain"
+            value={formatIDR(monthSummary.income)}
+            tone={monthSummary.income > 0 ? 'accent' : 'default'}
+            hint="Di luar gaji"
+          />
           <Stat label="Terpakai" value={formatIDR(monthSummary.spent)} />
           <Stat
             label="Sisa"
@@ -292,14 +529,48 @@ function TransactionsContent({ data, reload }) {
               Tutup
             </button>
           </div>
-          <h2 id="form-transaksi-title" className="text-[20px] tracking-[-0.03em] font-medium mb-[22px]">
-            {editing ? 'Ubah pengeluaran' : 'Catat pengeluaran'}
+          <h2 id="form-transaksi-title" className="text-[20px] tracking-[-0.03em] font-medium mb-[18px]">
+            {editing
+              ? formIsIncome ? 'Ubah pemasukan' : 'Ubah pengeluaran'
+              : formIsIncome ? 'Catat pemasukan' : 'Catat pengeluaran'}
           </h2>
 
-          {!hasBudgets ? (
+          {/* The kind lives here, at the top, before any field. It is the first
+              thing that differs between the two forms — a category dropdown
+              versus a free-text source — so deciding it up front means the rest
+              of the dialog never changes shape underneath the user mid-entry. */}
+          {!editing && (
+            <div
+              className="flex border border-ruang-line-2 rounded-[3px] mb-[18px]"
+              role="group"
+              aria-label="Jenis transaksi"
+            >
+              {KINDS.map((option) => {
+                const active = option.kind === formKind;
+                return (
+                  <button
+                    key={option.kind}
+                    type="button"
+                    onClick={() => handleFormKindChange(option.kind)}
+                    aria-pressed={active}
+                    className={`h-[38px] flex-1 text-[13px] font-medium transition-colors cursor-pointer ${
+                      active
+                        ? 'bg-ruang-accent text-ruang-accent-ink font-semibold'
+                        : 'text-ruang-muted hover:text-ruang-ink'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!formIsIncome && !hasBudgets ? (
             /* An expense row needs a category, so a new account with none is a
                dead end here. Link straight to the category form rather than
-               leaving the user to find it in settings on their own. */
+               leaving the user to find it in settings on their own. The income
+               form has no category and is therefore never blocked by this. */
             <div className="mb-[16px]">
               <EmptyState>
                 Buat kategori anggaran dulu sebelum mencatat pengeluaran.
@@ -313,44 +584,66 @@ function TransactionsContent({ data, reload }) {
               </Link>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col gap-[15px]" noValidate>
+            <form onSubmit={handleSubmit} onKeyDown={formKeyDown} className="flex flex-col gap-[15px]" noValidate>
+              {/* `autoFocus` is what actually puts the cursor here — a
+                  programmatic `.focus()` after `showModal()` is a hint the
+                  browser may decline, whereas autofocus on the mounted input is
+                  the behaviour the dialog's own focus trap then picks up. */}
               <TextField
                 id="field-description"
-                label="Nama pengeluaran"
-                value={form.description}
+                label={formIsIncome ? 'Nama pemasukan' : 'Nama pengeluaran'}
+                value={formValue.description}
                 onChange={(e) => setField('description', e.target.value)}
                 error={fieldErrors.description}
-                placeholder="Contoh: Belanja mingguan"
+                placeholder={formIsIncome ? 'Contoh: THR' : 'Contoh: Belanja mingguan'}
                 maxLength={80}
                 autoComplete="off"
+                autoFocus
               />
 
               <NumberField
                 id="field-amount"
                 label="Nominal"
-                value={form.amount}
+                value={formValue.amount}
                 onChange={(e) => setField('amount', e.target.value.replace(/[^\d]/g, ''))}
                 error={fieldErrors.amount}
                 placeholder="0"
+                grouped
               />
 
-              <SelectField
-                id="field-categoryId"
-                label="Kategori"
-                value={form.categoryId}
-                onChange={(e) => setField('categoryId', e.target.value)}
-                error={fieldErrors.categoryId}
-                placeholder="Pilih kategori"
-                options={budgets.map((budget) => ({ value: budget.id, label: budget.name }))}
-              />
+              {formIsIncome ? (
+                /* Optional, and the only optional field in the ledger. An empty
+                   one is stored as NULL so the row falls back to a generic
+                   label rather than rendering a blank. */
+                <TextField
+                  id="field-source"
+                  label="Sumber (opsional)"
+                  value={formValue.source}
+                  onChange={(e) => setField('source', e.target.value)}
+                  error={fieldErrors.source}
+                  placeholder="Contoh: THR"
+                  maxLength={40}
+                  autoComplete="off"
+                />
+              ) : (
+                <SelectField
+                  id="field-categoryId"
+                  label="Kategori"
+                  value={formValue.categoryId}
+                  onChange={(e) => setField('categoryId', e.target.value)}
+                  error={fieldErrors.categoryId}
+                  placeholder="Pilih kategori"
+                  options={budgets.map((budget) => ({ value: budget.id, label: budget.name }))}
+                />
+              )}
 
               <TextField
-                id="field-spentOn"
+                id={formIsIncome ? 'field-receivedOn' : 'field-spentOn'}
                 label="Tanggal"
                 type="date"
-                value={form.spentOn}
-                onChange={(e) => setField('spentOn', e.target.value)}
-                error={fieldErrors.spentOn}
+                value={formValue[formIsIncome ? 'receivedOn' : 'spentOn']}
+                onChange={(e) => setField(formIsIncome ? 'receivedOn' : 'spentOn', e.target.value)}
+                error={fieldErrors[formIsIncome ? 'receivedOn' : 'spentOn']}
                 max={todayISO()}
               />
 
@@ -363,6 +656,18 @@ function TransactionsContent({ data, reload }) {
                   {editing ? 'Simpan perubahan' : 'Simpan transaksi'}
                   <ArrowRightUpIcon size={15} aria-hidden="true" />
                 </Button>
+                {/* The secondary save. Not shown while editing, where "keep
+                    adding" has no meaning, and not while busy, where it would be
+                    a second way to double-submit. */}
+                {!editing && (
+                  <GhostButton
+                    onClick={(event) => handleSubmit(event, { keepOpen: true })}
+                    disabled={busy}
+                    className="flex-none"
+                  >
+                    Simpan, lanjut
+                  </GhostButton>
+                )}
                 {editing && (
                   <GhostButton onClick={resetForm} className="flex-none">
                     Batal
@@ -371,7 +676,9 @@ function TransactionsContent({ data, reload }) {
               </div>
 
               <small className="text-ruang-subtle text-[12px] leading-[1.6] text-center">
-                  Catatan tersimpan di akunmu dan bisa diubah kapan saja.
+                  {formIsIncome
+                    ? 'Pemasukan ini menambah dana bulan yang sama, di luar gaji.'
+                    : 'Catatan tersimpan di akunmu dan bisa diubah kapan saja.'}
               </small>
             </form>
           )}
@@ -382,19 +689,54 @@ function TransactionsContent({ data, reload }) {
           <Panel>
             <div className="flex items-start justify-between gap-[10px] mb-[16px]">
               <div className="min-w-0">
-                <Eyebrow>Daftar pengeluaran</Eyebrow>
+                <Eyebrow>Daftar {isIncome ? 'pemasukan' : 'pengeluaran'}</Eyebrow>
                 <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[6px] mb-[2px]">
                   {monthFilter === currentMonthKey() ? 'Transaksi bulan ini' : `Transaksi ${formatMonthLabel(monthFilter)}`}
                 </h2>
               </div>
               <span className="border border-ruang-line-3 px-[7px] py-[3px] text-ruang-muted font-mono text-[11px] tracking-[0.06em] flex-none">
-                {filtered.length} PENGELUARAN
+                {filtered.length} {isIncome ? 'PEMASUKAN' : 'PENGELUARAN'}
               </span>
             </div>
 
+            {/* Which list is on screen — filters, total, rows. Deliberately separate from
+                the dialog's own toggle: watching the list is not choosing what to
+                record, and nothing here affects the form. */}
+            <div
+              className="flex border border-ruang-line-2 mb-[14px] w-full sm:w-auto sm:self-start"
+              role="tablist"
+              aria-label="Jenis transaksi"
+            >
+              {KINDS.map((tab) => {
+                const activeTab = tab.kind === kind;
+                return (
+                  <button
+                    key={tab.kind}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab}
+                    onClick={() => handleKindChange(tab.kind)}
+                    className={`h-[34px] flex-1 sm:flex-none px-[16px] text-[12px] font-medium transition-colors cursor-pointer ${
+                      activeTab
+                        ? 'bg-ruang-accent text-ruang-accent-ink font-semibold'
+                        : 'text-ruang-muted hover:text-ruang-ink'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Filters. The category list also carries a delete control, which
-                is the only place in the app a category can be removed. */}
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-[9px] mb-[14px]">
+                is the only place in the app a category can be removed. Income
+                rows have no category, so that column is dropped rather than left
+                visible and matching nothing. */}
+            <div
+              className={`grid grid-cols-1 gap-[9px] mb-[14px] ${
+                isIncome ? 'sm:grid-cols-[1fr_1fr]' : 'sm:grid-cols-[1fr_1fr_auto]'
+              }`}
+            >
               <div className="relative">
                 <label htmlFor="filter-search" className="sr-only">
                   Cari transaksi
@@ -432,7 +774,7 @@ function TransactionsContent({ data, reload }) {
                 </select>
               </div>
 
-              <div>
+              <div className={isIncome ? 'hidden' : ''}>
                 <label htmlFor="filter-category" className="sr-only">
                   Filter kategori
                 </label>
@@ -457,7 +799,7 @@ function TransactionsContent({ data, reload }) {
             <div className="flex flex-wrap items-center justify-between gap-[10px] mb-[14px] py-[11px] border-y border-ruang-line">
               <span className="inline-flex items-center gap-[7px] font-mono text-[11px] tracking-[0.08em] text-ruang-muted">
                 <FilterIcon size={13} className="text-ruang-accent-text" aria-hidden="true" />
-                Total pengeluaran
+                Total {isIncome ? 'pemasukan' : 'pengeluaran'}
               </span>
               <strong className="font-mono text-[13px] text-ruang-ink">{formatIDR(visibleTotal)}</strong>
             </div>
@@ -465,12 +807,15 @@ function TransactionsContent({ data, reload }) {
             <ExpenseList
               expenses={filtered}
               budgets={budgets}
+              kind={kind}
               onEdit={handleEdit}
               onDelete={handleDelete}
               emptyLabel={
-                expenses.length
+                (isIncome ? incomes : expenses).length
                   ? 'Tidak ada transaksi yang cocok dengan filter ini.'
-                  : 'Belum ada transaksi. Catat pengeluaran pertama.'
+                  : isIncome
+                    ? 'Belum ada pemasukan di luar gaji. Catat THR atau pemasukan lain di sini.'
+                    : 'Belum ada transaksi. Catat pengeluaran pertama.'
               }
             />
           </Panel>
@@ -483,18 +828,27 @@ function TransactionsContent({ data, reload }) {
   );
 }
 
-function Stat({ label, value, tone = 'default' }) {
+/**
+ * One figure in the month summary.
+ *
+ * `accent` is used for the "Masuk lain" stat so a non-zero extra inflow reads as
+ * a positive figure rather than as another neutral number; the hint under it
+ * names what belongs in that field, because a stat labelled "Masuk lain" with
+ * no rows behind it is not self-explanatory.
+ */
+function Stat({ label, value, tone = 'default', hint }) {
   return (
     <div className="min-w-0">
       <small className="block font-mono text-[11px] text-ruang-subtle tracking-[0.09em] mb-[6px]">{label}</small>
       <strong
         className={`block font-mono text-[15px] font-medium truncate ${
-          tone === 'danger' ? 'text-ruang-danger' : 'text-ruang-ink'
+          tone === 'danger' ? 'text-ruang-danger' : tone === 'accent' ? 'text-ruang-accent-text' : 'text-ruang-ink'
         }`}
         title={value}
       >
         {value}
       </strong>
+      {hint && <small className="block text-[11px] text-ruang-subtle mt-[4px] truncate">{hint}</small>}
     </div>
   );
 }
