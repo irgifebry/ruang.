@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Build/test caches
+.eslintcache
+coverage/
+
+# Local env — only .env.example is committed
+.env
+.env.local
+.env.*.local
+
+# Google OAuth client credentials, downloaded from Cloud Console
+client_secret_*.json
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
