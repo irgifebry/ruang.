@@ -1,5 +1,7 @@
 /**
- * Desktop sidebar collapse state, and the DOM writes that apply it.
+ * Desktop sidebar state, and the DOM behaviours that apply it: the collapse
+ * attribute, the click target rule for reopening a collapsed rail, and the
+ * wheel guard that keeps the rail's own surface from scrolling the page.
  *
  * Deliberately has no `'use client'` and no React, for the same reason
  * `theme-presets.js` has none: `layout.jsx` imports
@@ -106,6 +108,38 @@ export function toggleSidebar() {
   applySidebar(document.documentElement, collapsed);
   storeSidebar(collapsed);
   return collapsed;
+}
+
+/**
+ * Keeps the wheel over `element` from scrolling whatever is behind it.
+ *
+ * The rail is a fixed, full-height pane floating over the page and has no
+ * scrollable content of its own, so a wheel aimed at it has nothing to move —
+ * and used to move the page instead, from a pointer that is nowhere near it.
+ * The guard makes the page scroll only when the pointer is over the page.
+ *
+ * Not CSS: the obvious declaration is `overscroll-behavior: contain`, which only
+ * silences chaining *out of a scroll container*. The rail would have to be one
+ * (`overflow-y: auto`) to feel it at all, and an overflow container clips what
+ * escapes it — the toggle button (half outside the right edge), the collapsed
+ * tooltips and the account popover all deliberately reach past the rail.
+ *
+ * And not `onWheel`, either: React attaches wheel listeners as passive, so the
+ * handler it gives an `onWheel` prop is not allowed to call `preventDefault`.
+ * This has to be a real listener with `passive: false`.
+ *
+ * Ctrl + wheel is deliberately left alone. That gesture is browser zoom, not
+ * scrolling, and a sidebar is not worth losing zoom over.
+ *
+ * Returns the detach function, so the caller can undo it on unmount.
+ */
+export function blockWheelScroll(element) {
+  const onWheel = (event) => {
+    if (event.ctrlKey) return;
+    event.preventDefault();
+  };
+  element.addEventListener('wheel', onWheel, { passive: false });
+  return () => element.removeEventListener('wheel', onWheel);
 }
 
 /**

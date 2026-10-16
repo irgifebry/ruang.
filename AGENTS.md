@@ -76,6 +76,7 @@ src/
     account-purge.js   Flag / cancel / destroy — server-side only
     safe-redirect.js   ?next= / redirect_uri validation
     idle-logout.js     Idle auto-logout: deadline, persistence, cross-tab (no React)
+    sidebar.js         Collapse state, rail hit-area rule, wheel guard (no React)
     category-colors.js Explicit color lookup table
     data.js            Sample data for guest page only
     theme.jsx          ThemeProvider + useTheme (client)
@@ -162,6 +163,17 @@ scripts/
   account popover. The cursor is inherited, so the nav links, the brand and the
   toggle re-assert `cursor-pointer` and `.account-menu` takes it back with
   `cursor: auto`.
+- **The rail and the mobile bar do not scroll the page.** `blockWheelScroll()` in
+  `src/lib/sidebar.js` is attached to both fixed panes by `Sidebar.jsx`, so a
+  wheel over the navigation does nothing and the page scrolls only when the
+  pointer is over the page. Three dead ends, all tried: `overscroll-behavior:
+  contain` only silences chaining *out of a scroll container*, so the rail would
+  first have to become one (`overflow-y: auto`) — and an overflow container
+  clips exactly what the rail deliberately lets escape, the toggle button, the
+  collapsed tooltips and the account popover; React attaches wheel listeners as
+  passive, so an `onWheel` prop cannot call `preventDefault`; and the drawer
+  needs no guard at all, because the body is already locked while it is open.
+  Ctrl + wheel is left alone — that gesture is zoom, not scrolling.
 
 ## Database
 

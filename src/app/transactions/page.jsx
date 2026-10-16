@@ -460,9 +460,9 @@ function TransactionsContent({ data, reload }) {
           <Stat label="Gaji" value={formatIDR(monthSummary.salary)} />
           <Stat
             label="Masuk lain"
+            note="(di luar gaji)"
             value={formatIDR(monthSummary.income)}
             tone={monthSummary.income > 0 ? 'accent' : 'default'}
-            hint="Di luar gaji"
           />
           <Stat label="Terpakai" value={formatIDR(monthSummary.spent)} />
           <Stat
@@ -650,7 +650,16 @@ function TransactionsContent({ data, reload }) {
               <FormMessage error={mutationError} success={success} />
 
               {/* `flex-wrap` so a nowrap label on a narrow phone drops the cancel button to
-                its own line instead of squeezing the label into two. */}
+                its own line instead of squeezing the label into two.
+
+                Both buttons carry the same `flex-1 basis-[160px]`, which is what makes
+                the row read as one pair. The labels here are long enough that the two
+                never fit side by side on a phone — "Simpan transaksi" plus an icon
+                needs ~173px and "Simpan, lanjut" ~134px, against ~293px of panel width
+                — so the secondary used to wrap and then, being `flex-none`, sit on its
+                own line hugging its own width under a full-width primary. Growing like
+                the primary means a wrapped row is two equal full-width buttons, and an
+                unwrapped one is two equal halves. */}
               <div className="flex flex-wrap gap-[9px] items-center">
                 <Button type="submit" busy={busy} busyLabel="Menyimpan..." className="flex-1 basis-[160px]">
                   {editing ? 'Simpan perubahan' : 'Simpan transaksi'}
@@ -663,13 +672,13 @@ function TransactionsContent({ data, reload }) {
                   <GhostButton
                     onClick={(event) => handleSubmit(event, { keepOpen: true })}
                     disabled={busy}
-                    className="flex-none"
+                    className="flex-1 basis-[160px]"
                   >
                     Simpan, lanjut
                   </GhostButton>
                 )}
                 {editing && (
-                  <GhostButton onClick={resetForm} className="flex-none">
+                  <GhostButton onClick={resetForm} className="flex-1 basis-[160px]">
                     Batal
                   </GhostButton>
                 )}
@@ -829,17 +838,35 @@ function TransactionsContent({ data, reload }) {
 }
 
 /**
- * One figure in the month summary.
+ * One figure in the month summary: a label over a number, and nothing else.
  *
- * `accent` is used for the "Masuk lain" stat so a non-zero extra inflow reads as
- * a positive figure rather than as another neutral number; the hint under it
- * names what belongs in that field, because a stat labelled "Masuk lain" with
- * no rows behind it is not self-explanatory.
+ * Every stat is exactly these two lines, so the four columns keep one rhythm and
+ * their numbers share a baseline. `note` is the qualifier a label needs to be
+ * unambiguous — "Masuk lain (di luar gaji)" — and it rides on the label rather
+ * than under the number: a third line under one figure made that column taller
+ * than its three neighbours, which is the thing this layout must not do.
+ *
+ * Below `sm` the grid is two columns, and "Masuk lain (di luar gaji)" is wider
+ * than one of them, so it wraps. The label therefore reserves two lines for
+ * every stat at that width, which keeps the wrapped column's number level with
+ * the number beside it; from `sm` up the label fits on one line and the
+ * reservation is dropped.
+ *
+ * `accent` marks the "Masuk lain" stat so a non-zero extra inflow reads as a
+ * positive figure rather than as another neutral number.
  */
-function Stat({ label, value, tone = 'default', hint }) {
+function Stat({ label, note, value, tone = 'default' }) {
   return (
     <div className="min-w-0">
-      <small className="block font-mono text-[11px] text-ruang-subtle tracking-[0.09em] mb-[6px]">{label}</small>
+      <small className="block font-mono text-[11px] text-ruang-subtle tracking-[0.09em] mb-[6px] min-h-[2lh] sm:min-h-0 sm:whitespace-nowrap">
+        {label}
+        {note && (
+          <>
+            {' '}
+            <span className="normal-case tracking-normal">{note}</span>
+          </>
+        )}
+      </small>
       <strong
         className={`block font-mono text-[15px] font-medium truncate ${
           tone === 'danger' ? 'text-ruang-danger' : tone === 'accent' ? 'text-ruang-accent-text' : 'text-ruang-ink'
@@ -848,7 +875,6 @@ function Stat({ label, value, tone = 'default', hint }) {
       >
         {value}
       </strong>
-      {hint && <small className="block text-[11px] text-ruang-subtle mt-[4px] truncate">{hint}</small>}
     </div>
   );
 }

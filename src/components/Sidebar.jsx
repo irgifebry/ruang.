@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { getSharedSession, signOut } from '@/lib/auth-client';
 import { clearIdleState } from '@/lib/idle-logout';
-import { toggleSidebar, isRailToggleClick } from '@/lib/sidebar';
+import { toggleSidebar, isRailToggleClick, blockWheelScroll } from '@/lib/sidebar';
 import { useProfile } from '@/hooks/useProfile';
 import {
   CloseIcon,
@@ -58,6 +58,10 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMounted, setDrawerMounted] = useState(false);
   const closeTimer = useRef(null);
+  // The two fixed panes of chrome — the mobile bar and the desktop rail. Both
+  // are guarded against the wheel by the effect below.
+  const barRef = useRef(null);
+  const railRef = useRef(null);
 
   const openDrawer = () => {
     clearTimeout(closeTimer.current);
@@ -97,6 +101,18 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
     };
   }, [drawerOpen]);
 
+  // The rail and the mobile bar float over the page and are not scroll
+  // surfaces, so a wheel aimed at either of them has nothing of its own to
+  // move — it used to move the page behind instead. Freeze it: the page scrolls
+  // only when the pointer is over the page. The drawer needs no guard. While it
+  // is open the body is locked by the effect above, and while it is closed it
+  // is not in the document at all.
+  useEffect(() => {
+    const panes = [barRef.current, railRef.current].filter(Boolean);
+    const detach = panes.map(blockWheelScroll);
+    return () => detach.forEach((off) => off());
+  }, []);
+
   // Escape closes the drawer, matching the dialog behaviour users expect.
   useEffect(() => {
     if (!drawerOpen) return undefined;
@@ -111,7 +127,10 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
     <>
       {/* Mobile bar. `lg:hidden`, and the desktop sidebar is hidden below `lg`,
           so exactly one of the two is ever in the layout. */}
-      <header className="lg:hidden fixed inset-x-0 top-0 z-40 h-[56px] flex items-center justify-between px-[16px] border-b border-ruang-line bg-ruang-shell/95 backdrop-blur">
+      <header
+        ref={barRef}
+        className="lg:hidden fixed inset-x-0 top-0 z-40 h-[56px] flex items-center justify-between px-[16px] border-b border-ruang-line bg-ruang-shell/95 backdrop-blur"
+      >
         <Brand />
         <button
           type="button"
@@ -179,6 +198,7 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
           next to the other collapsed-only rules, or it would show a resize
           cursor on an open rail whose background ignores clicks. */}
       <aside
+        ref={railRef}
         onClick={handleRailClick}
         className="sidebar-desktop hidden lg:flex fixed inset-y-0 left-0 w-sidebar border-r border-ruang-line bg-ruang-shell p-[28px_20px_20px] flex-col z-20 transition-[width] duration-[var(--sidebar-dur)] ease-[var(--sidebar-ease)]"
       >
