@@ -24,7 +24,10 @@ const dmMono = DM_Mono({
 });
 
 export const metadata = {
-  metadataBase: new URL('https://ruang.app'),
+  // Canonical origin used for every relative URL in this object (OG image,
+  // canonical link, etc.). Must match the deployed host, not a placeholder,
+  // otherwise sitemaps and canonicals point at a domain no one serves.
+  metadataBase: new URL('https://ruang-cashflow.vercel.app'),
   title: {
     default: 'ruang. — rencana keuangan pribadi',
     template: '%s · ruang.',
@@ -32,16 +35,38 @@ export const metadata = {
   description:
     'Ubah gaji bulanan jadi anggaran yang bisa dipantau, lalu catat setiap pengeluaran terhadapnya.',
   applicationName: 'ruang.',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'ruang. — rencana keuangan pribadi',
     description: 'Atur gaji jadi anggaran, catat pengeluaran, dan lihat sisa uangmu setiap bulan.',
+    url: '/',
+    siteName: 'ruang.',
     locale: 'id_ID',
     type: 'website',
+    images: [
+      {
+        url: '/opengraph-image',
+        width: 1200,
+        height: 630,
+        alt: 'ruang. — rencana keuangan pribadi',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ruang. — rencana keuangan pribadi',
+    description: 'Atur gaji jadi anggaran, catat pengeluaran, dan lihat sisa uangmu setiap bulan.',
+    images: ['/opengraph-image'],
   },
   robots: {
-    // Nothing here is worth indexing; the app is behind a login.
-    index: false,
-    follow: false,
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
   },
 };
 

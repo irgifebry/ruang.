@@ -9,6 +9,21 @@ import { Eyebrow } from '@/components/ui';
 export const metadata = {
   title: 'Atur uang bulananmu',
   description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+  alternates: { canonical: '/welcome' },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Atur uang bulananmu · ruang.',
+    description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    url: '/welcome',
+    type: 'website',
+    images: ['/opengraph-image'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Atur uang bulananmu · ruang.',
+    description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    images: ['/opengraph-image'],
+  },
 };
 
 /**
@@ -23,8 +38,22 @@ export default function WelcomePage() {
   const summary = getBudgetSummary(initialSalary, initialBudgets, initialExpenses);
   const recentExpenses = initialExpenses.slice(0, 5);
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'ruang.',
+    url: 'https://ruang-cashflow.vercel.app/welcome',
+    description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    applicationCategory: 'FinanceApplication',
+    operatingSystem: 'Web',
+    inLanguage: 'id',
+    offers: { '@type': 'Offer', price: 0, priceCurrency: 'IDR' },
+  };
+
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
       <header className="flex items-center justify-between gap-[18px]">
         <Brand />
         <div className="flex items-center gap-[10px]">
@@ -172,6 +201,7 @@ export default function WelcomePage() {
         <Link href="/welcome/help" className="text-[13px] text-ruang-muted hover:text-ruang-accent-text no-underline">Bantuan</Link>
       </footer>
     </div>
+    </>
   );
 }
 

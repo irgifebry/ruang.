@@ -23,6 +23,17 @@ const nextConfig = {
           },
         ],
       },
+      // Keep the authenticated app and auth/utility routes out of search
+      // results. Public marketing pages (welcome, about, help) are left
+      // indexable so crawlers can find them.
+      {
+        source: '/(login|register|reset-password|transactions|history|settings/:path*|auth/:path*|oauth/:path*)',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
+      {
+        source: '/',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
     ];
   },
 

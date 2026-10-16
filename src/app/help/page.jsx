@@ -4,6 +4,21 @@ import { FaqItem } from '@/components/faq-item';
 export const metadata = {
   title: 'Bantuan',
   description: 'Pertanyaan umum seputar ruang.: gaji, anggaran, riwayat, dan keamanan akun.',
+  alternates: { canonical: '/help' },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Bantuan · ruang.',
+    description: 'Pertanyaan umum seputar ruang.: gaji, anggaran, riwayat, dan keamanan akun.',
+    url: '/help',
+    type: 'article',
+    images: ['/opengraph-image'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Bantuan · ruang.',
+    description: 'Pertanyaan umum seputar ruang.: gaji, anggaran, riwayat, dan keamanan akun.',
+    images: ['/opengraph-image'],
+  },
 };
 
 const FAQ_GROUPS = [

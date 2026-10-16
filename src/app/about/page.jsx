@@ -3,6 +3,21 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Tentang',
   description: 'ruang. membantu kamu mengatur gaji, anggaran, dan pengeluaran bulanan.',
+  alternates: { canonical: '/about' },
+  robots: { index: true, follow: true },
+  openGraph: {
+    title: 'Tentang · ruang.',
+    description: 'ruang. membantu kamu mengatur gaji, anggaran, dan pengeluaran bulanan.',
+    url: '/about',
+    type: 'article',
+    images: ['/opengraph-image'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Tentang · ruang.',
+    description: 'ruang. membantu kamu mengatur gaji, anggaran, dan pengeluaran bulanan.',
+    images: ['/opengraph-image'],
+  },
 };
 
 const PRINCIPLES = [
