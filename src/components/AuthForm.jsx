@@ -6,6 +6,7 @@ import Script from 'next/script';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { signIn, signUp } from '@/lib/auth-client';
+import { safePath } from '@/lib/safe-redirect';
 import { IDLE_TIMEOUT_MS } from '@/lib/idle-logout';
 import { Button, FormMessage, TextField } from './form';
 import { EyeClosedIcon, EyeIcon, GoogleIcon } from './icons';
@@ -48,7 +49,7 @@ function AuthFormInner({ mode }) {
 
   // Same-origin relative paths only, so `?next=` cannot be used as an open
   // redirect to an attacker-controlled host. Shared by both sign-in paths.
-  const destination = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  const destination = safePath(next) || '/';
 
   // A Google flow that ends badly (consent declined, account already linked to
   // somebody else) is bounced back here by `errorCallbackURL` below. Read from

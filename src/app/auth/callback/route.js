@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safePath } from '@/lib/safe-redirect';
 
 /**
  * OAuth and email-confirmation landing route.
@@ -17,11 +18,13 @@ export async function GET(request) {
   const next = searchParams.get('next') || '/';
 
   // Only same-origin relative paths, so this cannot be used as an open redirect.
-  const target = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  const target = safePath(next) || '/';
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login`);
   }
+
+  const response = NextResponse.redirect(`${origin}${target}`);
 
   // The exchange needs the anon client and the visitor's auth cookies. Built
   // inline because importing the app's Supabase client would drag the browser
@@ -38,6 +41,7 @@ export async function GET(request) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
       },
     },
@@ -49,5 +53,5 @@ export async function GET(request) {
     return NextResponse.redirect(`${origin}/login?error=autentikasi-gagal`);
   }
 
-  return NextResponse.redirect(`${origin}${target}`);
+  return response;
 }

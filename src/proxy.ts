@@ -43,7 +43,8 @@ export async function proxy(request: NextRequest) {
   if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
     const rawNext = request.nextUrl.searchParams.get('next');
     const target = safeRedirectUri(rawNext, request.nextUrl.origin, '/');
-    const destination = target === '/login' || target === '/register' ? '/' : target;
+    const targetPath = new URL(target, request.nextUrl.origin).pathname;
+    const destination = targetPath === '/login' || targetPath === '/register' ? '/' : target;
     return NextResponse.redirect(new URL(destination, request.nextUrl));
   }
 
