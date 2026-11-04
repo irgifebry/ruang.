@@ -308,7 +308,7 @@ Rotating a Google client secret: Cloud Console → Credentials → edit → rese
   another tab signed out, and because Better Auth revokes a cookie every tab
   shares, this one follows; only a tab that genuinely went idle passes
   `?idle=1`, since that query is a claim about *why*.
-- **The idle window is `NEXT_PUBLIC_IDLE_TIMEOUT_MS`, default 15 minutes.**
+- **The idle window is `NEXT_PUBLIC_IDLE_TIMEOUT_MS`, default 1 hour.**
   Overridable for one reason: a guard that fires once every fifteen minutes is
   close to untestable on a deployed environment, where you cannot shorten the
   clock from a console. Set it to `20000` in Vercel to verify the whole path in

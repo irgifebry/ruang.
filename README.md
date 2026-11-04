@@ -50,7 +50,7 @@ Salin `.env.example` ke `.env.local` lalu isi dari Supabase Dashboard
 | `EMAIL_FROM` | ya | Pengirim, mis. `Ruang <onboarding@resend.dev>` |
 | `CRON_SECRET` | ya | Bearer token `/api/cron/purge-deletions`. Tanpa ini route menolak semua panggilan dan akun yang ditandai tidak pernah benar-benar dihapus |
 | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | tidak | Keduanya harus ada atau keduanya tidak ada; pasang salah satu bikin `auth.js` gagal saat boot |
-| `NEXT_PUBLIC_IDLE_TIMEOUT_MS` | tidak | Default `900000` (15 menit). Di bawah `1000` diabaikan |
+| `NEXT_PUBLIC_IDLE_TIMEOUT_MS` | tidak | Default `3600000` (1 jam). Di bawah `1000` diabaikan |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` | tidak | Cloudflare Turnstile; kalau diisi, login & daftar wajib lewat captcha |
 
 > Hanya `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` yang
