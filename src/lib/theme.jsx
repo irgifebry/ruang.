@@ -52,7 +52,9 @@ export function ThemeProvider({ children }) {
       .then(({ data }) => {
         if (active) setUserId(data?.user?.id ?? null);
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.warn('[theme] gagal memuat sesi pengguna:', error?.error || error);
+      });
 
     return () => {
       active = false;

@@ -125,8 +125,16 @@ export function applyTheme(element, theme) {
   element.classList.toggle('dark', !isLight);
   applyFavicon(isLight);
 
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', isLight ? '#f6f7f2' : '#0b0d0c');
+  const metaList = document.querySelectorAll('meta[name="theme-color"]');
+  const color = isLight ? '#f6f7f2' : '#0b0d0c';
+  if (metaList.length > 0) {
+    metaList.forEach((meta) => meta.setAttribute('content', color));
+  } else {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = color;
+    document.head.appendChild(meta);
+  }
 }
 
 /**
@@ -177,8 +185,8 @@ export function storeTheme(theme) {
  */
 export const PRE_HYDRATION_THEME_SCRIPT = `(function(){try{
 var t=localStorage.getItem(${JSON.stringify(THEME_KEY)})||${JSON.stringify(DEFAULT_THEME)},
-d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches,
-l=t==='light'||(t==='system'&&!d),
+m=window.matchMedia,
+l=t==='light'||(t==='system'&&!!m&&!m('(prefers-color-scheme: dark)').matches),
 F=${JSON.stringify(FAVICON_FILL)},I=${JSON.stringify(FAVICON_INK)},
 p=l?'light':'dark',
 e=document.documentElement;

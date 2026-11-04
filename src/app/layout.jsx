@@ -72,12 +72,15 @@ export const metadata = {
 
 /**
  * Colour scheme for browser widgets (scrollbars, form controls, the date
- * picker). The initial value is a hint; the pre-paint script below sets the
- * accurate one on `<html>`.
+ * picker). Follows system preference on initial paint; dynamic updates are
+ * handled by the theme provider.
  */
 export const viewport = {
-  themeColor: '#0b0d0c',
-  colorScheme: 'dark',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f6f7f2' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b0d0c' },
+  ],
+  colorScheme: 'dark light',
 };
 
 /**

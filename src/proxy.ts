@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
+import { safeRedirectUri } from '@/lib/safe-redirect';
 
 /**
  * Next.js 16 renamed `middleware.ts` to `proxy.ts`, and only picks it up when it
@@ -9,13 +9,13 @@ import { auth } from '@/lib/auth';
  */
 export async function proxy(request: NextRequest) {
   const session = await auth.api.getSession({
-    headers: await headers(),
+    headers: request.headers,
   });
 
   const GUEST_ROUTES = ['/welcome', '/login', '/register', '/reset-password', '/auth', '/help', '/about'];
 
   function isGuestRoute(pathname: string) {
-    return GUEST_ROUTES.some((route) => pathname.startsWith(route));
+    return GUEST_ROUTES.some((route) => pathname === route || pathname.startsWith(route + '/'));
   }
 
   if (
@@ -39,18 +39,19 @@ export async function proxy(request: NextRequest) {
   }
 
   // A signed-in user has no reason to sit on the login or register form either.
-  // `?next=` is dropped so it cannot bounce the user straight back here after
-  // signing in.
+  // Validate `?next=` to prevent open redirects; fall back to root.
   if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
-    const url = request.nextUrl.clone();
-    url.pathname = request.nextUrl.searchParams.get('next') || '/';
-    url.search = '';
-    return NextResponse.redirect(url);
+    const rawNext = request.nextUrl.searchParams.get('next');
+    const target = safeRedirectUri(rawNext, request.nextUrl.origin, '/');
+    const destination = target === '/login' || target === '/register' ? '/' : target;
+    return NextResponse.redirect(new URL(destination, request.nextUrl));
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map)$).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|opengraph-image|twitter-image|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|map|txt|xml)$).*)',
+  ],
 };
