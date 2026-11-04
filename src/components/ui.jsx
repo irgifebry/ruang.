@@ -18,7 +18,7 @@ export function Eyebrow({ children, className = '' }) {
 /** Full-height loading state shared by every data-backed page. */
 export function LoadingState({ label = 'Memuat data...' }) {
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto">
+    <div className="py-section max-w-[1310px] mx-auto">
       <div className="flex flex-col items-center justify-center min-h-[65vh]" role="status" aria-live="polite">
         <span className="w-[32px] h-[32px] bg-ruang-accent rounded-full flex items-center justify-center text-ruang-accent-ink">
           <LoaderIcon size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -36,7 +36,7 @@ export function LoadingState({ label = 'Memuat data...' }) {
  */
 export function ErrorState({ message, onRetry, retryLabel = 'Coba lagi' }) {
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto">
+    <div className="py-section max-w-[1310px] mx-auto">
       <div className="flex flex-col items-center justify-center min-h-[65vh] text-center px-[22px]">
         <span className="w-[34px] h-[34px] bg-ruang-danger-ink rounded-full flex items-center justify-center text-ruang-accent-ink">
           <DangerCircleIcon size={18} aria-hidden="true" />

@@ -121,7 +121,7 @@ export function ExpenseRow({ expense, budget, kind, onEdit, onDelete, dense = fa
               type="button"
               onClick={() => onEdit(expense)}
               aria-label={`Ubah transaksi ${expense.description}`}
-              className="w-[26px] h-[26px] grid place-items-center text-ruang-subtle hover:text-ruang-accent-text rounded-[3px] transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-ruang-subtle hover:text-ruang-accent-text rounded-[3px] transition-colors"
             >
               <PencilGlyph />
             </button>
@@ -131,7 +131,7 @@ export function ExpenseRow({ expense, budget, kind, onEdit, onDelete, dense = fa
               type="button"
               onClick={() => onDelete(expense)}
               aria-label={`Hapus transaksi ${expense.description}`}
-              className="w-[26px] h-[26px] grid place-items-center text-ruang-subtle hover:text-ruang-danger-ink rounded-[3px] transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-ruang-subtle hover:text-ruang-danger-ink rounded-[3px] transition-colors"
             >
               <TrashGlyph />
             </button>

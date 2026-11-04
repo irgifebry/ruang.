@@ -22,7 +22,7 @@ export default function AppShell({ children }) {
     return (
       <div className="min-h-screen bg-ruang-bg text-ruang-ink flex flex-col justify-center">
         <IdleLogout />
-        <main className="w-full max-w-[1800px] mx-auto px-[22px] sm:px-[48px] py-[34px] relative">{children}</main>
+        <main className="w-full max-w-[1800px] mx-auto px-6 sm:px-12 py-section relative">{children}</main>
       </div>
     );
   }
@@ -35,9 +35,9 @@ export default function AppShell({ children }) {
           back to the desktop sidebar, which is fixed at full height.
           `lg:ml-sidebar` is the same `--sidebar-w` the rail draws itself with,
           so the gutter follows a collapse instead of snapping after it. The page
-          padding drops to 22px on small screens so content is not squeezed
+          padding uses standard tokens so content is not squeezed
           against the edge. */}
-      <main className="pt-[56px] lg:pt-0 lg:ml-sidebar min-h-screen max-w-[1800px] px-[22px] sm:px-[30px] lg:px-[48px] relative transition-[margin-left] duration-[var(--sidebar-dur)] ease-[var(--sidebar-ease)]">
+      <main className="pt-[56px] lg:pt-0 lg:ml-sidebar min-h-screen max-w-[1800px] px-6 sm:px-8 lg:px-12 relative transition-[margin-left] duration-[var(--sidebar-dur)] ease-[var(--sidebar-ease)]">
         {children}
       </main>
     </div>

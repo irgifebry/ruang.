@@ -144,7 +144,7 @@ export function PasswordPanel({ className = '' }) {
   return (
     <>
       <Panel className={className}>
-        <div className="flex items-start justify-between gap-[16px]">
+        <div className="flex items-start justify-between gap-card">
           <div className="min-w-0">
             <h2 className="text-[17px] font-medium tracking-tight mb-1">Kata sandi</h2>
             {/* Say what the button will actually do, not what the field is. An
@@ -202,7 +202,7 @@ export function PasswordPanel({ className = '' }) {
           {!status && !statusError ? (
             <p className="text-[13px] text-ruang-subtle font-mono">memuat status akun...</p>
           ) : hasPassword ? (
-        <form onSubmit={handleChangePassword} className="flex flex-col gap-[16px]">
+        <form onSubmit={handleChangePassword} className="flex flex-col gap-card">
               <TextField
                 label="Kata sandi saat ini"
                 type="password"
@@ -246,7 +246,7 @@ export function PasswordPanel({ className = '' }) {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleSetPassword} className="flex flex-col gap-[16px]">
+            <form onSubmit={handleSetPassword} className="flex flex-col gap-card">
               <TextField
                 label="Kata sandi baru"
                 type="password"

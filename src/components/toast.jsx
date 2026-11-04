@@ -93,7 +93,7 @@ export function Toast({
       <div
         role="status"
         aria-live="polite"
-        className={`pointer-events-auto relative overflow-hidden bg-ruang-panel-2 border border-ruang-line-3 shadow-[0_18px_50px_rgba(0,0,0,0.5)] ${closing ? 'toast-out' : 'toast-in'}`}
+        className={`pointer-events-auto relative overflow-hidden bg-ruang-panel-2 border border-ruang-line-3 shadow-2xl ${closing ? 'toast-out' : 'toast-in'}`}
       >
         <div className="flex items-start gap-[11px] p-[14px_15px_16px]">
           <span className="w-[26px] h-[26px] flex-none grid place-items-center rounded-full bg-ruang-hover text-ruang-muted">

@@ -123,7 +123,7 @@ export function DeleteAccountPanel({ deletionRequestedAt = null, className = '' 
   return (
     <>
       <Panel className={className}>
-        <div className="flex items-start justify-between gap-[16px]">
+        <div className="flex items-start justify-between gap-card">
           <div className="min-w-0">
             <h2 className="text-[17px] font-medium tracking-tight mb-1">Hapus akun</h2>
             {/* The grace period is the whole point of this panel, so it is in the
@@ -214,7 +214,7 @@ export function DeleteAccountPanel({ deletionRequestedAt = null, className = '' 
               </div>
             </>
           ) : (
-            <form onSubmit={handleRequest} className="flex flex-col gap-[16px]">
+            <form onSubmit={handleRequest} className="flex flex-col gap-card">
               {!status && !statusError && (
                 <p className="text-[13px] text-ruang-subtle font-mono">memuat status akun...</p>
               )}

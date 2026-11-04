@@ -130,7 +130,7 @@ export function ConfirmDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={`relative w-full max-w-[420px] bg-ruang-panel-2 border border-ruang-line-3 p-[21px_23px] shadow-[0_24px_70px_rgba(0,0,0,0.6)] ${closing ? 'confirm-out' : 'confirm-in'}`}
+        className={`relative w-full max-w-[420px] bg-ruang-panel-2 border border-ruang-line-3 p-[21px_23px] shadow-2xl ${closing ? 'confirm-out' : 'confirm-in'}`}
       >
         <div className="flex items-start gap-[12px]">
           <span className="w-[30px] h-[30px] flex-none grid place-items-center rounded-full bg-ruang-danger-surface text-ruang-danger-ink">

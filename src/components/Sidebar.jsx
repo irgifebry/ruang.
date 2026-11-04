@@ -149,7 +149,7 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
             type="button"
             aria-label="Tutup menu navigasi"
             onClick={closeDrawer}
-            className={`${drawerOpen ? 'overlay-in' : 'overlay-out'} absolute inset-0 bg-black/70`}
+            className={`${drawerOpen ? 'overlay-in' : 'overlay-out'} absolute inset-0 bg-ruang-overlay`}
             tabIndex={drawerOpen ? 0 : -1}
             aria-hidden={!drawerOpen}
           />
@@ -167,7 +167,7 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
                 type="button"
                 onClick={closeDrawer}
                 aria-label="Tutup menu"
-                className="w-[32px] h-[32px] grid place-items-center text-ruang-muted hover:text-ruang-ink hover:bg-ruang-hover rounded-[6px] transition-colors"
+                className="min-w-[44px] min-h-[44px] grid place-items-center text-ruang-muted hover:text-ruang-ink hover:bg-ruang-hover rounded-[6px] transition-colors"
               >
                 <CloseIcon size={15} aria-hidden="true" />
               </button>
@@ -239,7 +239,7 @@ function CollapseToggle() {
     <button
       type="button"
       onClick={toggleSidebar}
-      className="sidebar-toggle absolute top-[74px] right-[-13px] z-30 w-[26px] h-[26px] grid place-items-center rounded-full border border-ruang-line-3 bg-ruang-shell text-ruang-muted hover:text-ruang-ink hover:border-ruang-accent-text transition-colors cursor-pointer"
+      className="sidebar-toggle absolute top-[74px] right-[-22px] z-30 min-w-[44px] min-h-[44px] grid place-items-center rounded-full border border-ruang-line-3 bg-ruang-shell text-ruang-muted hover:text-ruang-ink hover:border-ruang-accent-text transition-colors cursor-pointer"
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
         <path d="M15 6l-6 6 6 6" />

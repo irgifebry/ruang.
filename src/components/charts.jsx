@@ -59,7 +59,7 @@ export function AllocationDonut({ categories = [], total = 0, centerValue, cente
     <Panel>
       <ChartHeader eyebrow="ALOKASI KATEGORI" title="Porsi anggaran" />
 
-      <div className="flex flex-col items-center sm:flex-row gap-[22px] mt-[20px]">
+      <div className="flex flex-col items-center sm:flex-row gap-card mt-card">
         <div className="relative w-[168px] h-[168px] flex-none">
           <svg
             viewBox={`0 0 ${VIEW} ${VIEW}`}
@@ -188,12 +188,12 @@ export function SpendChart({
       </div>
 
       {!points.length || ceiling <= 0 ? (
-        <EmptyState className="mt-[20px]">
+        <EmptyState className="mt-card">
           {emptyLabel ?? 'Belum ada pengeluaran pada rentang ini.'}
         </EmptyState>
       ) : (
         <>
-          <div className="flex items-end justify-between gap-[10px] mt-[20px] mb-[10px]">
+          <div className="flex items-end justify-between gap-[10px] mt-card mb-[10px]">
             <span className="font-mono text-[11px] tracking-[0.09em] text-ruang-subtle">
               TOTAL {formatIDR(total)}
             </span>
@@ -309,7 +309,7 @@ export function CashflowChart({ series = [], months = 6, emptyLabel }) {
           priced in the row itself, and the two fills are told apart by position
           (in above out) as well as by hue, so the chart does not rely on colour
           to say which is which. */}
-      <ul className="mt-[18px] flex flex-col">
+      <ul className="mt-card flex flex-col">
         {rows.map((row, index) => (
           <CashflowRow key={row.key ?? index} row={row} peak={peak} index={index} />
         ))}
