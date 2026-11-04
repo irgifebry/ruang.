@@ -39,7 +39,7 @@ export default function HistoryPage() {
   const totalSpent = rows.reduce((sum, row) => sum + row.spent, 0);
 
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
+    <div className="py-section max-w-[1310px] mx-auto" id="konten">
       <header className="mb-section">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.065em] leading-[1.12] font-medium">
           Riwayat
@@ -88,7 +88,7 @@ export default function HistoryPage() {
 
           <section>
             <Panel>
-              <div className="flex items-center justify-between mb-[18px]">
+              <div className="flex items-center justify-between mb-section">
                 <div>
                   <Eyebrow>Perbandingan</Eyebrow>
                   <h2 className="text-[20px] tracking-[-0.04em] font-medium m-[6px_0_0]">Pengeluaran per bulan</h2>
@@ -125,7 +125,7 @@ export default function HistoryPage() {
                           into the label, where it costs no extra line. The
                           transaction count and the top category share the row
                           underneath, which is wide enough for both. */}
-                      <div className="mt-[13px] grid grid-cols-2 gap-x-[16px]">
+                      <div className="mt-[13px] grid grid-cols-2 gap-card">
                         <div className="min-w-0">
                           <small className="block font-mono text-[10px] uppercase tracking-[0.09em] text-ruang-subtle mb-[5px]">
                             {/* "Masuk" rather than "Gaji": the figure is the
@@ -191,7 +191,7 @@ export default function HistoryPage() {
         </>
       )}
 
-      <div className="border border-ruang-line p-[16px_18px] mt-section flex items-start gap-[12px]">
+      <div className="border border-ruang-line p-card mt-section flex items-start gap-[12px]">
         <span className="w-[7px] h-[7px] bg-ruang-accent flex-none mt-[6px]" />
         <p className="text-[13px] text-ruang-muted leading-[1.65]">
           Riwayat dihitung dari transaksi yang tersimpan di akunmu. Sebuah bulan masuk riwayat setelah kamu

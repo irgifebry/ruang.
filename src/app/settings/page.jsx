@@ -220,7 +220,7 @@ function SettingsContent({ data, reload }) {
   };
 
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
+    <div className="py-section max-w-[1310px] mx-auto" id="konten">
       <header className="mb-section">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.065em] leading-[1.12] font-medium">
           Pengaturan
@@ -230,19 +230,19 @@ function SettingsContent({ data, reload }) {
       <section className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] gap-card items-start">
         {/* Salary -------------------------------------------------------- */}
         <Panel>
-              <Eyebrow className="mb-[12px]">Gaji</Eyebrow>
-          <h2 className="text-[19px] tracking-[-0.04em] font-medium mb-[16px]">Gaji per bulan</h2>
+          <Eyebrow className="mb-card">Gaji</Eyebrow>
+          <h2 className="text-[19px] tracking-[-0.04em] font-medium mb-card">Gaji per bulan</h2>
 
           {/* Month picker. The salary form edits one month at a time, so the
               figure on screen always belongs to the month named here rather
               than to whatever "now" happens to be. */}
-          <div className="flex items-center gap-[8px] mb-[16px]">
+          <div className="flex items-center gap-card mb-card">
             <button
               type="button"
               onClick={() => stepMonth(-1)}
               disabled={!monthOptions.includes(shiftMonth(salaryMonth, -1))}
               aria-label="Bulan sebelumnya"
-              className="w-[36px] h-[36px] flex-none grid place-items-center border border-ruang-line-2 rounded-[3px] text-ruang-subtle hover:text-ruang-accent-text hover:border-ruang-accent-text transition-colors disabled:opacity-30 hover:text-ruang-subtle hover:border-ruang-line-2 cursor-pointer"
+              className="w-[44px] h-[44px] flex-none grid place-items-center border border-ruang-line-2 rounded-[3px] text-ruang-subtle hover:text-ruang-accent-text hover:border-ruang-accent-text transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
               <ArrowLeftIcon size={13} aria-hidden="true" />
             </button>
@@ -255,7 +255,7 @@ function SettingsContent({ data, reload }) {
                 id="salary-month"
                 value={salaryMonth}
                 onChange={(e) => selectMonth(e.target.value)}
-                className="w-full h-[36px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
+                className="w-full h-[44px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
               >
                 {monthOptions.map((key) => (
                   <option key={key} value={key} className="bg-ruang-shell">
@@ -272,7 +272,7 @@ function SettingsContent({ data, reload }) {
               onClick={() => stepMonth(1)}
               disabled={!monthOptions.includes(shiftMonth(salaryMonth, 1))}
               aria-label="Bulan berikutnya"
-              className="w-[36px] h-[36px] flex-none grid place-items-center border border-ruang-line-2 rounded-[3px] text-ruang-subtle hover:text-ruang-accent-text hover:border-ruang-accent-text transition-colors disabled:opacity-30 hover:text-ruang-subtle hover:border-ruang-line-2 cursor-pointer"
+              className="w-[44px] h-[44px] flex-none grid place-items-center border border-ruang-line-2 rounded-[3px] text-ruang-subtle hover:text-ruang-accent-text hover:border-ruang-accent-text transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
             >
               <ArrowRightIcon size={13} aria-hidden="true" />
             </button>
@@ -293,7 +293,7 @@ function SettingsContent({ data, reload }) {
             hint="Gaji bersih bulan itu. Menyimpan hanya mengubah bulan yang dipilih. Nominal nol berarti bulan itu belum diisi, jadi tidak masuk riwayat."
           />
 
-          <div className="mt-[16px] flex items-center gap-[10px]">
+          <div className="mt-card flex items-center gap-[10px]">
             <Button onClick={handleSalarySave} busy={busy} busyLabel="Menyimpan...">
               Simpan gaji <ArrowRightUpIcon size={15} aria-hidden="true" />
             </Button>
@@ -312,7 +312,7 @@ function SettingsContent({ data, reload }) {
             </p>
           )}
 
-          <div className="mt-[20px] pt-[16px] border-t border-ruang-line">
+          <div className="mt-[20px] pt-card border-t border-ruang-line">
             <div className="flex items-center justify-between gap-[10px]">
               <span className="font-mono text-[11px] tracking-[0.08em] text-ruang-subtle uppercase">
                 Anggaran dan gaji {formatMonthLabel(salaryMonth).toUpperCase()}
@@ -342,7 +342,7 @@ function SettingsContent({ data, reload }) {
               One row per month the user actually saved. Months that were never
               filled in have no row here and no entry on /history, so nothing
               appears that nobody entered. */}
-          <div className="mt-[20px] pt-[16px] border-t border-ruang-line">
+          <div className="mt-[20px] pt-card border-t border-ruang-line">
             <div className="flex items-center justify-between gap-[10px] mb-[10px]">
               <span className="font-mono text-[11px] tracking-[0.08em] text-ruang-subtle uppercase">Riwayat gaji</span>
               <span className="font-mono text-[11px] text-ruang-subtle">
@@ -518,7 +518,7 @@ function SettingsContent({ data, reload }) {
                       type="button"
                       onClick={() => startEdit(budget)}
                       aria-label={`Ubah kategori ${budget.name}`}
-                      className="w-[28px] h-[28px] grid place-items-center text-ruang-subtle hover:text-ruang-accent-text rounded-[3px] transition-colors"
+                      className="w-[44px] h-[44px] grid place-items-center text-ruang-subtle hover:text-ruang-accent-text rounded-[3px] transition-colors cursor-pointer"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                         <path d="M4 20h4L20 8l-4-4L4 16v4Z" />
@@ -528,7 +528,7 @@ function SettingsContent({ data, reload }) {
                       type="button"
                       onClick={() => handleDelete(budget)}
                       aria-label={`Hapus kategori ${budget.name}`}
-                      className="w-[28px] h-[28px] grid place-items-center text-ruang-subtle hover:text-ruang-danger-ink rounded-[3px] transition-colors"
+                      className="w-[44px] h-[44px] grid place-items-center text-ruang-subtle hover:text-ruang-danger-ink rounded-[3px] transition-colors cursor-pointer"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                         <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />

@@ -173,7 +173,7 @@ function ProfileContent({ data, reload }) {
   const initial = (name.trim() || email || 'Pengguna').charAt(0).toUpperCase();
 
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
+    <div className="py-section max-w-[1310px] mx-auto" id="konten">
       <header className="mb-section">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.065em] leading-[1.12] font-medium">
           Profil
@@ -188,8 +188,12 @@ function ProfileContent({ data, reload }) {
             Nama ini akan terlihat di menu dan aplikasi.
           </p>
 
-          <div className="flex items-center gap-[16px] mb-[20px]">
-            <span className="w-[68px] h-[68px] rounded-full flex-none overflow-hidden bg-ruang-hover border border-ruang-line-2 grid place-items-center text-ruang-accent-text text-[24px] font-semibold">
+          <div className="flex items-center gap-card mb-[20px]">
+            <span
+              className="w-[68px] h-[68px] rounded-full flex-none overflow-hidden bg-ruang-hover border border-ruang-line-2 grid place-items-center text-ruang-accent-text text-[24px] font-semibold"
+              aria-label="Foto profil"
+              role="img"
+            >
               {avatarSrc ? (
                 // eslint-disable-next-line @next/next/no-img-element -- a
                 // user-supplied avatar in a public bucket; the Next image
@@ -235,7 +239,7 @@ function ProfileContent({ data, reload }) {
             </p>
           )}
 
-          <form onSubmit={handleSaveProfile} className="flex flex-col gap-[16px]">
+          <form onSubmit={handleSaveProfile} className="flex flex-col gap-card">
             <TextField
               label="Nama tampilan"
               value={name}
@@ -331,13 +335,27 @@ function ThemeOption({ item, selected, onSelect }) {
         {/* A miniature of the theme rather than a word alone, so the choice is
             visible instead of something the user has to imagine. */}
         <span
-          className="flex h-[22px] overflow-hidden border border-ruang-line"
-          style={{ background: dark ? '#0b0d0c' : '#f6f7f2' }}
+          className="flex h-[22px] overflow-hidden border border-ruang-line bg-ruang-bg"
+          style={
+            dark
+              ? {
+                  '--c-bg': '11 13 12',
+                  '--c-shell': '12 15 13',
+                  '--c-body': '168 176 167',
+                  '--c-accent': '201 251 85',
+                }
+              : {
+                  '--c-bg': '246 247 242',
+                  '--c-shell': '255 255 255',
+                  '--c-body': '74 82 71',
+                  '--c-accent': '122 168 12',
+                }
+          }
         >
-          <span className="w-[22%] h-full" style={{ background: dark ? '#0c0f0d' : '#ffffff' }} />
+          <span className="w-[22%] h-full bg-ruang-shell" />
           <span className="flex-1 h-full flex items-center px-[4px] gap-[3px]">
-            <span className="h-[2px] w-[60%] block" style={{ background: dark ? '#a8b0a7' : '#4a5247' }} />
-            <span className="h-[5px] w-[16%] block" style={{ background: '#7aa80c' }} />
+            <span className="h-[2px] w-[60%] block bg-ruang-body" />
+            <span className="h-[5px] w-[16%] block bg-ruang-accent" />
           </span>
         </span>
         <span className="text-[12px] text-ruang-body leading-tight">{item.label}</span>
