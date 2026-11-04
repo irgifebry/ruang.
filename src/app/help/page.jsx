@@ -82,7 +82,7 @@ const FAQ_GROUPS = [
 
 export default async function HelpPage() {
   return (
-    <div className="py-[34px] max-w-[900px] mx-auto" id="konten">
+    <div className="py-section max-w-[900px] mx-auto" id="konten">
       <header className="mb-section">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.065em] leading-[1.12] font-medium">Bantuan</h1>
         <p className="max-w-[540px] text-[14px] text-ruang-muted leading-[1.7]">
@@ -98,7 +98,7 @@ export default async function HelpPage() {
             aria-labelledby={`judul-topik-${index}`}
             className="break-inside-avoid mb-section last:mb-0"
           >
-            <h2 id={`judul-topik-${index}`} className="mb-[12px] text-[18px] tracking-[-0.035em] font-medium">{group.title}</h2>
+            <h2 id={`judul-topik-${index}`} className="mb-card text-[18px] tracking-[-0.035em] font-medium">{group.title}</h2>
             <div className="border-t border-ruang-line">
               {group.items.map((item) => (
                 <FaqItem key={item.q} question={item.q} answer={item.a} />
@@ -108,7 +108,7 @@ export default async function HelpPage() {
         ))}
       </div>
 
-      <div className="flex flex-wrap gap-[12px] mt-section pt-[20px] border-t border-ruang-line">
+      <div className="flex flex-wrap gap-[12px] mt-section pt-card border-t border-ruang-line">
         <Link
           href="/settings"
           className="h-[42px] px-[18px] flex items-center text-[13px] font-semibold rounded-[4px] bg-ruang-accent text-ruang-accent-ink hover:bg-ruang-accent-hover transition-colors active:scale-95 no-underline"
