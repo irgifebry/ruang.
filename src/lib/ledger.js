@@ -14,7 +14,7 @@ import {
   toPositive,
   todayISO,
 } from './money.js';
-import { getSession } from './auth-client.js';
+import { getSharedSession } from './auth-client.js';
 
 /** Thrown for anything the user should see a message about, not a stack trace. */
 export class DataError extends Error {}
@@ -34,7 +34,7 @@ async function callLedger(action, payload = {}) {
 
 /** Resolves the signed-in user id, or throws if there is no session. */
 export async function requireUserId() {
-  const { data } = await getSession();
+  const { data } = await getSharedSession();
   if (!data?.user) {
     throw new DataError('Sesi tidak ditemukan. Silakan masuk kembali.');
   }
@@ -188,7 +188,11 @@ export function validateExpense({ description, amount, categoryId, spentOn }, bu
 
   if (!spentOn) {
     errors.spentOn = 'Pilih tanggal.';
-  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(spentOn) || Number.isNaN(new Date(spentOn).getTime())) {
+  } else if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(spentOn) ||
+    Number.isNaN(new Date(spentOn).getTime()) ||
+    new Date(spentOn).toISOString().slice(0, 10) !== spentOn
+  ) {
     errors.spentOn = 'Tanggal tidak valid.';
   }
 
@@ -254,7 +258,11 @@ export function validateIncome({ description, amount, source, receivedOn }) {
 
   if (!receivedOn) {
     errors.receivedOn = 'Pilih tanggal.';
-  } else if (!/^\d{4}-\d{2}-\d{2}$/.test(receivedOn) || Number.isNaN(new Date(receivedOn).getTime())) {
+  } else if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(receivedOn) ||
+    Number.isNaN(new Date(receivedOn).getTime()) ||
+    new Date(receivedOn).toISOString().slice(0, 10) !== receivedOn
+  ) {
     errors.receivedOn = 'Tanggal tidak valid.';
   }
 

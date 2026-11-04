@@ -129,7 +129,7 @@ export async function POST(request) {
               e.created_at,
               json_build_object('id', b.id, 'name', b.name, 'color', b.color) AS budgets
             FROM expenses e
-            JOIN budgets b ON e.category_id = b.id
+            JOIN budgets b ON e.category_id = b.id AND b.user_id = e.user_id
             WHERE e.user_id = $1
             ORDER BY e.spent_on DESC, e.created_at DESC`,
             [userId]
@@ -235,7 +235,7 @@ export async function POST(request) {
               e.created_at,
               json_build_object('id', b.id, 'name', b.name, 'color', b.color) AS budgets
             FROM expenses e
-            JOIN budgets b ON e.category_id = b.id
+            JOIN budgets b ON e.category_id = b.id AND b.user_id = e.user_id
             WHERE e.user_id = $1 AND e.spent_on >= $2
             ORDER BY e.spent_on DESC, e.created_at DESC`,
             [userId, windowStart]
@@ -403,16 +403,28 @@ export async function POST(request) {
         if (!validDate(month, true) || !validAmount(amount, true)) {
           return errorResponse('Data gaji tidak valid.');
         }
-        await pool.query(
-          `INSERT INTO salary_records (user_id, month, amount, updated_at)
-          VALUES ($1, $2, $3, now())
-          ON CONFLICT (user_id, month)
-          DO UPDATE SET amount = EXCLUDED.amount, updated_at = now()`,
-          [userId, month, amount]
-        );
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          await client.query(
+            `INSERT INTO salary_records (user_id, month, amount, updated_at)
+            VALUES ($1, $2, $3, now())
+            ON CONFLICT (user_id, month)
+            DO UPDATE SET amount = EXCLUDED.amount, updated_at = now()`,
+            [userId, month, amount]
+          );
 
-        if (monthKey(month) === currentMonthKey()) {
-          await pool.query('UPDATE profiles SET salary = $1 WHERE id = $2', [amount, userId]);
+          if (monthKey(month) === currentMonthKey()) {
+            await client.query('UPDATE profiles SET salary = $1 WHERE id = $2', [amount, userId]);
+          }
+          await client.query('COMMIT');
+        } catch (err) {
+          try {
+            await client.query('ROLLBACK');
+          } catch {}
+          throw err;
+        } finally {
+          client.release();
         }
         return NextResponse.json({ success: true });
       }
@@ -433,7 +445,7 @@ export async function POST(request) {
         if ('avatar_path' in patch && patch.avatar_path !== null &&
             (typeof patch.avatar_path !== 'string' || patch.avatar_path.length > 300 ||
              !patch.avatar_path.startsWith(`${userId}/`) ||
-             !/^avatar-[0-9a-f-]{36}\.(jpg|png|webp|gif)$/i.test(patch.avatar_path.slice(userId.length + 1)))) {
+             !/^avatar-[0-9a-zA-Z-]{8,36}\.(jpg|jpeg|png|webp|gif)$/i.test(patch.avatar_path.slice(userId.length + 1)))) {
           return errorResponse('Path avatar tidak valid.');
         }
         if ('provider_image' in patch && patch.provider_image !== null) {
@@ -458,7 +470,8 @@ export async function POST(request) {
 
         if (fields.length > 0) {
           values.push(userId);
-          await pool.query(`UPDATE profiles SET ${fields.join(', ')} WHERE id = $${idx}`, values);
+          const res = await pool.query(`UPDATE profiles SET ${fields.join(', ')} WHERE id = $${idx}`, values);
+          if (res.rowCount === 0) return errorResponse('Profil tidak ditemukan.', 404);
 
           if ('name' in patch && patch.name) {
             await pool.query('UPDATE "user" SET name = $1 WHERE id = $2', [patch.name.trim(), userId]);
