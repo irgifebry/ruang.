@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { purgeExpiredAccounts } from '@/lib/account-purge';
 
@@ -26,8 +27,15 @@ export async function GET(request) {
     );
   }
 
-  const authorization = request.headers.get('authorization');
-  if (authorization !== `Bearer ${secret}`) {
+  const authorization = request.headers.get('authorization') ?? '';
+  const expected = `Bearer ${secret}`;
+  const authBuffer = Buffer.from(authorization);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (
+    authBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(authBuffer, expectedBuffer)
+  ) {
     return NextResponse.json({ error: 'Permintaan ditolak.' }, { status: 401 });
   }
 

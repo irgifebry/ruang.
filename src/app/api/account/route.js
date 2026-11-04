@@ -33,6 +33,7 @@ const MIN_PASSWORD_LENGTH = 8;
  * a present one has to match the request's own origin exactly.
  */
 function isSameOrigin(request) {
+  if (request.headers.get('sec-fetch-site') === 'cross-site') return false;
   const origin = request.headers.get('origin');
   if (!origin) return true;
   return origin === request.nextUrl.origin;
@@ -143,6 +144,10 @@ export async function PATCH(request) {
     requestedAt = await requestDeletion(user.id);
   } catch (error) {
     return serverError('Account deletion request failed:', error);
+  }
+
+  if (!requestedAt) {
+    return NextResponse.json({ error: 'Profil tidak ditemukan.' }, { status: 404 });
   }
 
   // Every session goes, including this one: a pending account should not be

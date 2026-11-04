@@ -36,8 +36,19 @@ export async function requestDeletion(userId) {
 
 /** Clears the flag. A no-op once the row is gone, which is the point. */
 export async function cancelDeletion(userId) {
+  const { rows } = await getPool().query(
+    'SELECT deletion_requested_at FROM profiles WHERE id = $1',
+    [userId]
+  );
+  const requestedAt = rows[0]?.deletion_requested_at;
+  if (!requestedAt) return;
+
+  if (isDeletionExpired(requestedAt)) {
+    throw new Error('Masa tenggang penghapusan akun telah berakhir.');
+  }
+
   await getPool().query(
-    'UPDATE profiles SET deletion_requested_at = NULL WHERE id = $1 AND deletion_requested_at IS NOT NULL',
+    'UPDATE profiles SET deletion_requested_at = NULL WHERE id = $1',
     [userId]
   );
 }
@@ -73,13 +84,18 @@ export async function purgeExpiredAccounts() {
     [DELETION_GRACE_DAYS]
   );
 
-  const ids = due.rows.map((row) => row.id);
-  const avatars = collectAvatars(due.rows);
+  const purged = [];
+  for (const row of due.rows) {
+    try {
+      await destroyRows([row.id]);
+      await removeAvatars(collectAvatars([row]));
+      purged.push(row.id);
+    } catch (error) {
+      console.error(`Failed to purge account ${row.id}:`, error);
+    }
+  }
 
-  await destroyRows(ids);
-  await removeAvatars(avatars);
-
-  return ids;
+  return purged;
 }
 
 /**
@@ -117,6 +133,8 @@ async function destroyRows(ids) {
       await client.query('DELETE FROM budgets WHERE user_id = $1', [id]);
       await client.query('DELETE FROM salary_records WHERE user_id = $1', [id]);
       await client.query('DELETE FROM profiles WHERE id = $1', [id]);
+      await client.query('DELETE FROM "session" WHERE "userId" = $1', [id]);
+      await client.query('DELETE FROM "account" WHERE "userId" = $1', [id]);
       await client.query('DELETE FROM "user" WHERE id = $1', [id]);
     }
     await client.query('COMMIT');
