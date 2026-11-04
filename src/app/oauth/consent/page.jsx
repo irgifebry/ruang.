@@ -1,9 +1,9 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/client';
+import { getSharedSession } from '@/lib/auth-client';
 import { safePath, safeRedirectUri } from '@/lib/safe-redirect';
 import { Button, GhostButton } from '@/components/form';
 import { LoadingState, Panel } from '@/components/ui';
@@ -38,8 +38,6 @@ function ConsentScreen() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const supabaseRef = useRef(null);
-  if (supabaseRef.current === null) supabaseRef.current = createClient();
 
   const [ready, setReady] = useState(false);
 
@@ -48,8 +46,7 @@ function ConsentScreen() {
 
   useEffect(() => {
     let active = true;
-    supabaseRef.current.auth
-      .getSession()
+    getSharedSession()
       .then(({ data }) => {
         if (!active) return;
         if (!data?.session) {
