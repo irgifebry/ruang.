@@ -372,7 +372,10 @@ function UserBlock({ session, onSignOut, signingOut }) {
   const avatarSrc = !resolved
     ? null
     : profile?.avatar_path
-      ? `https://bqgxiiuaefbnxslzkoek.supabase.co/storage/v1/object/public/avatars/${profile.avatar_path}${version ? `?v=${version}` : ''}`
+      ? (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bqgxiiuaefbnxslzkoek.supabase.co') +
+        '/storage/v1/object/public/avatars/' +
+        encodeURI(profile.avatar_path) +
+        (version ? `?v=${version}` : '')
       : profile?.provider_image || null;
 
   return (

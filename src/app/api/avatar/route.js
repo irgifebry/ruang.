@@ -135,20 +135,27 @@ export async function DELETE(request) {
     const path = body?.path;
     const filename = typeof path === 'string' ? path.slice(user.id.length + 1) : '';
     if (typeof path !== 'string' || !path.startsWith(`${user.id}/`) ||
-        !/^avatar-[0-9a-f-]{36}\.(jpg|png|webp|gif)$/i.test(filename)) {
+        !/^avatar-[0-9a-zA-Z-]{8,36}\.(jpg|jpeg|png|webp|gif)$/i.test(filename)) {
       return responseError('Path avatar tidak valid.', 400);
     }
 
-    const cleared = await getPool().query(
-      'UPDATE profiles SET avatar_path = NULL WHERE id = $1 AND avatar_path = $2 RETURNING id',
+    const pool = getPool();
+    const existing = await pool.query(
+      'SELECT id FROM profiles WHERE id = $1 AND avatar_path = $2',
       [user.id, path],
     );
-    if (!cleared.rowCount) return responseError('Foto tidak ditemukan.', 404);
+    if (!existing.rowCount) return responseError('Foto tidak ditemukan.', 404);
+
     const { error } = await storageAdmin().storage.from('avatars').remove([path]);
     if (error) {
-      console.error('Avatar object cleanup failed after profile update:', error);
-      return responseError('Foto dilepas dari profil, tetapi file gagal dibersihkan.', 500);
+      console.error('Avatar storage remove failed:', error);
+      return responseError('Gagal menghapus foto.', 500);
     }
+
+    await pool.query(
+      'UPDATE profiles SET avatar_path = NULL WHERE id = $1 AND avatar_path = $2',
+      [user.id, path],
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Avatar delete failed:', error);
