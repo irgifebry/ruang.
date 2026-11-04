@@ -54,7 +54,8 @@ export const IDLE_KEY = 'ruang-idle-last-active';
  */
 function readTimeout() {
   const configured = Number(process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured >= 1000 ? configured : 15 * 60 * 1000;
+  // ponytail: default 1 hour (3600000ms), override via NEXT_PUBLIC_IDLE_TIMEOUT_MS
+  return Number.isFinite(configured) && configured >= 1000 ? configured : 60 * 60 * 1000;
 }
 
 export const IDLE_TIMEOUT_MS = readTimeout();

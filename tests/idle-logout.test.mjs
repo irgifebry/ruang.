@@ -192,11 +192,8 @@ function harness({ storage = {}, hidden = false, timeout, warnBefore } = {}) {
 // The numbers
 // ---------------------------------------------------------------------------
 
-test('the idle window is fifteen minutes', () => {
-  // Fifteen, not the thirty the old inline timer used: this is an app for
-  // personal finances, and the device it is left open on is more likely to be
-  // borrowed than not.
-  assert.equal(IDLE_TIMEOUT_MS, 15 * 60 * 1000);
+test('the idle window is one hour', () => {
+  assert.equal(IDLE_TIMEOUT_MS, 60 * 60 * 1000);
 });
 
 test('a broken timeout setting falls back to the default', () => {
@@ -206,14 +203,14 @@ test('a broken timeout setting falls back to the default', () => {
   // worse than the guard it replaced.
   const readTimeout = (raw) => {
     const configured = Number(raw);
-    return Number.isFinite(configured) && configured >= 1000 ? configured : 15 * 60 * 1000;
+    return Number.isFinite(configured) && configured >= 1000 ? configured : 60 * 60 * 1000;
   };
 
-  assert.equal(readTimeout(undefined), 900_000);
-  assert.equal(readTimeout(''), 900_000);
-  assert.equal(readTimeout('not-a-number'), 900_000);
-  assert.equal(readTimeout('500'), 900_000);
-  assert.equal(readTimeout(0), 900_000);
+  assert.equal(readTimeout(undefined), 3_600_000);
+  assert.equal(readTimeout(''), 3_600_000);
+  assert.equal(readTimeout('not-a-number'), 3_600_000);
+  assert.equal(readTimeout('500'), 3_600_000);
+  assert.equal(readTimeout(0), 3_600_000);
   assert.equal(readTimeout('20000'), 20_000);
 });
 
@@ -327,9 +324,9 @@ test('clearing removes the entry', () => {
 // ---------------------------------------------------------------------------
 
 test('a clock older than the window is expired on arrival', () => {
-  // The closed-tab case. The tab shut forty minutes ago; reopening the app must
-  // not quietly buy another fifteen.
-  const h = harness({ storage: { [IDLE_KEY]: String(1_000_000 - 40 * 60 * 1000) } });
+  // The closed-tab case. The tab shut seventy minutes ago; reopening the app must
+  // not quietly buy another sixty.
+  const h = harness({ storage: { [IDLE_KEY]: String(1_000_000 - 70 * 60 * 1000) } });
   h.start();
   assert.equal(h.calls.timeout, 1);
 });
@@ -345,9 +342,8 @@ test('a clock inside the window is kept, not rewritten', () => {
   assert.equal(h.env.writes.length, 0, 'start must not move the clock');
 
   // Still measured from the stored activity, so the window keeps its original
-  // end rather than restarting: another ten minutes takes the remaining five
-  // out of it.
-  h.advance(10 * 60 * 1000);
+  // end rather than restarting: another 56 minutes takes it past 60 min.
+  h.advance(56 * 60 * 1000);
   h.check();
   assert.equal(h.calls.timeout, 1);
 });
@@ -657,7 +653,7 @@ test('a page restored from the back/forward cache is re-checked', () => {
 test('a first load is not mistaken for a cache restore', () => {
   // `pageshow` fires on every load, with `persisted` false. Acting on it would
   // re-check a clock `start` has only just read.
-  const h = harness({ storage: { [IDLE_KEY]: String(1_000_000 - 20 * 60 * 1000) } });
+  const h = harness({ storage: { [IDLE_KEY]: String(1_000_000 - 70 * 60 * 1000) } });
   h.start();
   assert.equal(h.calls.timeout, 1, 'the stored clock is already past');
 
@@ -678,7 +674,7 @@ test('a clock from another tab is adopted', () => {
   // to move the other's deadline.
   const h = harness();
   h.start();
-  h.advance(14 * 60 * 1000);
+  h.advance(59 * 60 * 1000);
   h.check();
   assert.equal(h.calls.warn, 1, 'this tab is about to warn on its own');
 
@@ -740,8 +736,8 @@ test("another tab's clock that is already past ends this one too", () => {
   const loaded = h.now;
 
   // This tab has been frozen since it loaded. The other tab was last used eight
-  // minutes after that, and half an hour has passed since.
-  h.advance(30 * 60 * 1000);
+  // minutes after that, and eighty minutes have passed since.
+  h.advance(80 * 60 * 1000);
   h.fire('storage', { key: IDLE_KEY, newValue: String(loaded + 8 * 60 * 1000) });
 
   assert.equal(h.calls.timeout, 1);
