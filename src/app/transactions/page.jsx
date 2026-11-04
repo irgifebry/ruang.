@@ -428,8 +428,8 @@ function TransactionsContent({ data, reload }) {
   const hasBudgets = budgets.length > 0;
 
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
-      <header className="mb-section flex flex-col sm:flex-row items-start sm:items-end justify-between gap-[16px]">
+    <div className="py-section max-w-[1310px] mx-auto" id="konten">
+      <header className="mb-section flex flex-col sm:flex-row items-start sm:items-end justify-between gap-card">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.05em] leading-[1.12] font-medium">
           Transaksi
         </h1>
@@ -443,7 +443,7 @@ function TransactionsContent({ data, reload }) {
       </header>
 
       <Panel className="mb-card">
-        <div className="flex items-center justify-between mb-[14px]">
+        <div className="flex items-center justify-between mb-card">
           <div>
             <Eyebrow>Bulan ini</Eyebrow>
             <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[6px] mb-[2px]">Ringkasan</h2>
@@ -473,7 +473,7 @@ function TransactionsContent({ data, reload }) {
         </div>
 
         {budgets.length > 0 && (
-          <div className="mt-[18px] pt-[15px] border-t border-ruang-line">
+          <div className="mt-card pt-[15px] border-t border-ruang-line">
             <h3 className="font-mono text-[11px] tracking-[0.09em] text-ruang-subtle mb-[10px]">
               Kategori bulan ini
             </h3>
@@ -497,7 +497,7 @@ function TransactionsContent({ data, reload }) {
                     type="button"
                     onClick={() => handleCategoryDelete(category)}
                     aria-label={`Hapus kategori ${category.name}`}
-                    className="w-[24px] h-[24px] grid place-items-center text-ruang-subtle hover:text-ruang-danger-ink transition-colors flex-none"
+                    className="min-w-[44px] min-h-[44px] grid place-items-center text-ruang-subtle hover:text-ruang-danger-ink transition-colors flex-none cursor-pointer"
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                       <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />
@@ -524,12 +524,13 @@ function TransactionsContent({ data, reload }) {
             <button
               type="button"
               onClick={resetForm}
-              className="border-0 bg-none p-0 text-ruang-muted text-[12px] hover:text-ruang-accent-text transition-colors cursor-pointer"
+              aria-label="Tutup"
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-end border-0 bg-none text-ruang-muted text-[12px] hover:text-ruang-accent-text transition-colors cursor-pointer"
             >
               Tutup
             </button>
           </div>
-          <h2 id="form-transaksi-title" className="text-[20px] tracking-[-0.03em] font-medium mb-[18px]">
+          <h2 id="form-transaksi-title" className="text-[20px] tracking-[-0.03em] font-medium mb-card">
             {editing
               ? formIsIncome ? 'Ubah pemasukan' : 'Ubah pengeluaran'
               : formIsIncome ? 'Catat pemasukan' : 'Catat pengeluaran'}
@@ -541,7 +542,7 @@ function TransactionsContent({ data, reload }) {
               of the dialog never changes shape underneath the user mid-entry. */}
           {!editing && (
             <div
-              className="flex border border-ruang-line-2 rounded-[3px] mb-[18px]"
+              className="flex border border-ruang-line-2 rounded-[3px] mb-card"
               role="group"
               aria-label="Jenis transaksi"
             >
@@ -571,7 +572,7 @@ function TransactionsContent({ data, reload }) {
                dead end here. Link straight to the category form rather than
                leaving the user to find it in settings on their own. The income
                form has no category and is therefore never blocked by this. */
-            <div className="mb-[16px]">
+            <div className="mb-card">
               <EmptyState>
                 Buat kategori anggaran dulu sebelum mencatat pengeluaran.
               </EmptyState>
@@ -696,7 +697,7 @@ function TransactionsContent({ data, reload }) {
 
         <div className="min-w-0">
           <Panel>
-            <div className="flex items-start justify-between gap-[10px] mb-[16px]">
+            <div className="flex items-start justify-between gap-[10px] mb-card">
               <div className="min-w-0">
                 <Eyebrow>Daftar {isIncome ? 'pemasukan' : 'pengeluaran'}</Eyebrow>
                 <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[6px] mb-[2px]">
@@ -712,7 +713,7 @@ function TransactionsContent({ data, reload }) {
                 the dialog's own toggle: watching the list is not choosing what to
                 record, and nothing here affects the form. */}
             <div
-              className="flex border border-ruang-line-2 mb-[14px] w-full sm:w-auto sm:self-start"
+              className="flex border border-ruang-line-2 mb-card w-full sm:w-auto sm:self-start"
               role="tablist"
               aria-label="Jenis transaksi"
             >
@@ -723,9 +724,20 @@ function TransactionsContent({ data, reload }) {
                     key={tab.kind}
                     type="button"
                     role="tab"
+                    id={`tab-${tab.kind}`}
+                    aria-controls="panel-transaksi"
                     aria-selected={activeTab}
+                    tabIndex={activeTab ? 0 : -1}
                     onClick={() => handleKindChange(tab.kind)}
-                    className={`h-[34px] flex-1 sm:flex-none px-[16px] text-[12px] font-medium transition-colors cursor-pointer ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        const next = tab.kind === 'expense' ? 'income' : 'expense';
+                        handleKindChange(next);
+                        document.getElementById(`tab-${next}`)?.focus();
+                      }
+                    }}
+                    className={`min-h-[44px] flex-1 sm:flex-none px-[16px] text-[12px] font-medium transition-colors cursor-pointer ${
                       activeTab
                         ? 'bg-ruang-accent text-ruang-accent-ink font-semibold'
                         : 'text-ruang-muted hover:text-ruang-ink'
@@ -737,96 +749,136 @@ function TransactionsContent({ data, reload }) {
               })}
             </div>
 
-            {/* Filters. The category list also carries a delete control, which
-                is the only place in the app a category can be removed. Income
-                rows have no category, so that column is dropped rather than left
-                visible and matching nothing. */}
-            <div
-              className={`grid grid-cols-1 gap-[9px] mb-[14px] ${
-                isIncome ? 'sm:grid-cols-[1fr_1fr]' : 'sm:grid-cols-[1fr_1fr_auto]'
-              }`}
-            >
-              <div className="relative">
-                <label htmlFor="filter-search" className="sr-only">
-                  Cari transaksi
-                </label>
-                <MagnifierIcon
-                  size={14}
-                  className="absolute left-[11px] top-1/2 -translate-y-1/2 text-ruang-subtle pointer-events-none"
-                  aria-hidden="true"
-                />
-                <input
-                  id="filter-search"
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Cari nama..."
-                  className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink pl-[32px] pr-[10px] text-[13px] outline-none focus:border-ruang-accent-text placeholder:text-ruang-ghost"
-                />
-              </div>
+            <div id="panel-transaksi" role="tabpanel" aria-labelledby={`tab-${kind}`}>
+              {/* Filters. The category list also carries a delete control, which
+                  is the only place in the app a category can be removed. Income
+                  rows have no category, so that column is dropped rather than left
+                  visible and matching nothing. */}
+              <div
+                className={`grid grid-cols-1 gap-[9px] mb-card ${
+                  isIncome ? 'sm:grid-cols-[1fr_1fr]' : 'sm:grid-cols-[1fr_1fr_auto]'
+                }`}
+              >
+                <div className="relative">
+                  <label htmlFor="filter-search" className="sr-only">
+                    Cari transaksi
+                  </label>
+                  <MagnifierIcon
+                    size={14}
+                    className="absolute left-[11px] top-1/2 -translate-y-1/2 text-ruang-subtle pointer-events-none"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="filter-search"
+                    name="search"
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Cari nama..."
+                    aria-label="Cari transaksi"
+                    className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink pl-[32px] pr-[10px] text-[13px] outline-none focus:border-ruang-accent-text placeholder:text-ruang-ghost"
+                  />
+                </div>
 
-              <div>
-                <label htmlFor="filter-month" className="sr-only">
-                  Filter bulan
-                </label>
-                <select
-                  id="filter-month"
-                  value={monthFilter}
-                  onChange={(e) => setMonthFilter(e.target.value)}
-                  className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
-                >
-                  {monthsWithData.map((key) => (
-                    <option key={key} value={key} className="bg-ruang-shell">
-                      {formatMonthLabel(key)}
+                <div>
+                  <label htmlFor="filter-month" className="sr-only">
+                    Filter bulan
+                  </label>
+                  <select
+                    id="filter-month"
+                    name="month"
+                    value={monthFilter}
+                    onChange={(e) => setMonthFilter(e.target.value)}
+                    aria-label="Filter bulan"
+                    className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
+                  >
+                    {monthsWithData.map((key) => (
+                      <option key={key} value={key} className="bg-ruang-shell">
+                        {formatMonthLabel(key)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={isIncome ? 'hidden' : ''}>
+                  <label htmlFor="filter-category" className="sr-only">
+                    Filter kategori
+                  </label>
+                  <select
+                    id="filter-category"
+                    name="category"
+                    value={categoryFilter}
+                    onChange={(e) => setCategoryFilter(e.target.value)}
+                    aria-label="Filter kategori"
+                    className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
+                  >
+                    <option value="" className="bg-ruang-shell">
+                      Semua kategori
                     </option>
-                  ))}
-                </select>
+                    {budgets.map((budget) => (
+                      <option key={budget.id} value={budget.id} className="bg-ruang-shell">
+                        {budget.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className={isIncome ? 'hidden' : ''}>
-                <label htmlFor="filter-category" className="sr-only">
-                  Filter kategori
-                </label>
-                <select
-                  id="filter-category"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
-                >
-                  <option value="" className="bg-ruang-shell">
-                    Semua kategori
-                  </option>
-                  {budgets.map((budget) => (
-                    <option key={budget.id} value={budget.id} className="bg-ruang-shell">
-                      {budget.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-wrap items-center justify-between gap-[10px] mb-card py-[11px] border-y border-ruang-line">
+                <span className="inline-flex items-center gap-[7px] font-mono text-[11px] tracking-[0.08em] text-ruang-muted">
+                  <FilterIcon size={13} className="text-ruang-accent-text" aria-hidden="true" />
+                  Total {isIncome ? 'pemasukan' : 'pengeluaran'}
+                </span>
+                <strong className="font-mono text-[13px] text-ruang-ink">{formatIDR(visibleTotal)}</strong>
               </div>
-            </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-[10px] mb-[14px] py-[11px] border-y border-ruang-line">
-              <span className="inline-flex items-center gap-[7px] font-mono text-[11px] tracking-[0.08em] text-ruang-muted">
-                <FilterIcon size={13} className="text-ruang-accent-text" aria-hidden="true" />
-                Total {isIncome ? 'pemasukan' : 'pengeluaran'}
-              </span>
-              <strong className="font-mono text-[13px] text-ruang-ink">{formatIDR(visibleTotal)}</strong>
+              <ExpenseList
+                expenses={filtered}
+                budgets={budgets}
+                kind={kind}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                emptyLabel={
+                  (isIncome ? incomes : expenses).length ? (
+                    'Tidak ada transaksi yang cocok dengan filter ini.'
+                  ) : isIncome ? (
+                    <span>
+                      Belum ada pemasukan di luar gaji.{' '}
+                      <button
+                        type="button"
+                        onClick={() => openForm('income')}
+                        className="text-ruang-accent-text underline underline-offset-2 hover:text-ruang-accent cursor-pointer"
+                      >
+                        Catat pemasukan
+                      </button>{' '}
+                      untuk menambah dana bulan ini.
+                    </span>
+                  ) : !hasBudgets ? (
+                    <span>
+                      Buat kategori anggaran dulu sebelum mencatat pengeluaran.{' '}
+                      <Link
+                        href="/settings#form-kategori"
+                        className="text-ruang-accent-text underline underline-offset-2 hover:text-ruang-accent"
+                      >
+                        Buat kategori
+                      </Link>
+                    </span>
+                  ) : (
+                    <span>
+                      Belum ada transaksi.{' '}
+                      <button
+                        type="button"
+                        onClick={() => openForm('expense')}
+                        className="text-ruang-accent-text underline underline-offset-2 hover:text-ruang-accent cursor-pointer"
+                      >
+                        Catat pengeluaran
+                      </button>{' '}
+                      pertama.
+                    </span>
+                  )
+                }
+              />
             </div>
-
-            <ExpenseList
-              expenses={filtered}
-              budgets={budgets}
-              kind={kind}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              emptyLabel={
-                (isIncome ? incomes : expenses).length
-                  ? 'Tidak ada transaksi yang cocok dengan filter ini.'
-                  : isIncome
-                    ? 'Belum ada pemasukan di luar gaji. Catat THR atau pemasukan lain di sini.'
-                    : 'Belum ada transaksi. Catat pengeluaran pertama.'
-              }
-            />
           </Panel>
 
         </div>

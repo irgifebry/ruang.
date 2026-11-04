@@ -111,8 +111,8 @@ function DashboardContent({ data }) {
   );
 
   return (
-    <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
-      <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-[16px] mb-section">
+    <div className="py-section max-w-[1310px] mx-auto" id="konten">
+      <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-card mb-section">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.05em] leading-[1.12] font-medium">
           Ringkasan
         </h1>
@@ -143,7 +143,7 @@ function DashboardContent({ data }) {
               after another and need no shared baseline, so the floor above does
               not apply and the headline would otherwise butt against the meter.
               From `lg` up the floor does the spacing and `mb-0` keeps it. */}
-          <div className="flex flex-col mb-[22px] lg:mb-0 lg:min-h-[140px]">
+          <div className="flex flex-col mb-card lg:mb-0 lg:min-h-[140px]">
             <div className="flex items-center justify-between gap-[10px]">
               <div>
               <Eyebrow>{formatMonthLabel(month)}</Eyebrow>
@@ -191,7 +191,7 @@ function DashboardContent({ data }) {
             <div
               className="h-[5px] bg-ruang-track rounded-[4px] overflow-hidden"
               role="progressbar"
-              aria-valuenow={Math.round(remainingPercent)}
+              aria-valuenow={Math.min(100, Math.round(remainingPercent))}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label="Persentase sisa uang dari pemasukan bulan ini"
@@ -250,7 +250,7 @@ function DashboardContent({ data }) {
         <Panel className="flex flex-col">
           {/* Matches the left card: clearance from the meter below `lg` only,
               where the shared floor is not in play. */}
-          <div className="flex flex-col mb-[22px] lg:mb-0 lg:min-h-[140px]">
+          <div className="flex flex-col mb-card lg:mb-0 lg:min-h-[140px]">
             <div className="flex items-center justify-between gap-[10px]">
               <div>
                 <Eyebrow>Anggaran</Eyebrow>
@@ -280,7 +280,7 @@ function DashboardContent({ data }) {
             <div
               className="h-[5px] bg-ruang-track rounded-[4px] overflow-hidden"
               role="progressbar"
-              aria-valuenow={Math.round(summary.allocated ? (summary.spent / summary.allocated) * 100 : 0)}
+              aria-valuenow={Math.min(100, Math.round(summary.allocated ? (summary.spent / summary.allocated) * 100 : 0))}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label="Anggaran bulanan terpakai"
@@ -324,9 +324,23 @@ function DashboardContent({ data }) {
         <AllocationDonut
           categories={allocation}
           emptyLabel={
-            budgets.length
-              ? 'Belum ada anggaran bulanan yang bisa dihitung.'
-              : 'Belum ada kategori. Buat anggaran di pengaturan untuk melihat porsinya.'
+            budgets.length ? (
+              <>
+                Belum ada anggaran bulanan yang bisa dihitung.{' '}
+                <Link href="/settings" className="text-ruang-accent-text underline underline-offset-2 hover:text-ruang-accent">
+                  Atur anggaran
+                </Link>{' '}
+                untuk melihat porsinya.
+              </>
+            ) : (
+              <>
+                Belum ada kategori.{' '}
+                <Link href="/settings" className="text-ruang-accent-text underline underline-offset-2 hover:text-ruang-accent">
+                  Buat anggaran
+                </Link>{' '}
+                di pengaturan untuk melihat porsinya.
+              </>
+            )
           }
         />
 
@@ -353,7 +367,7 @@ function DashboardContent({ data }) {
 
       <section className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-card mt-section">
         <div className="min-w-0">
-          <div className="flex items-center justify-between mb-[17px]">
+          <div className="flex items-center justify-between mb-card">
             <div>
               <Eyebrow>Anggaran</Eyebrow>
               <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[6px] mb-[2px]">Anggaran kategori</h2>
@@ -383,7 +397,7 @@ function DashboardContent({ data }) {
         </div>
 
         <div className="min-w-0">
-          <div className="flex items-center justify-between mb-[17px]">
+          <div className="flex items-center justify-between mb-card">
             <div>
               <Eyebrow>Terbaru</Eyebrow>
               <h2 className="text-[20px] tracking-[-0.03em] font-medium mt-[6px] mb-[2px]">Transaksi</h2>
