@@ -46,8 +46,8 @@ const FAQ = [
 
 export default function WelcomeHelpPage() {
   return (
-    <div className="mx-auto max-w-[760px] py-[28px]" id="konten" aria-label="Bantuan">
-      <header className="mb-section flex items-center justify-between gap-[16px]">
+    <div className="mx-auto max-w-[760px] py-section" id="konten" role="region" aria-label="Bantuan">
+      <header className="mb-section flex items-center justify-between gap-card">
         <Link href="/welcome" className="text-[13px] text-ruang-muted no-underline hover:text-ruang-accent-text">
           ← Kembali
         </Link>
@@ -61,7 +61,7 @@ export default function WelcomeHelpPage() {
           key={item.q}
           question={item.q}
           answer={item.a}
-          className="border-b-0 border-t py-[17px] last:border-b"
+          className="border-b-0 border-t py-card last:border-b"
         />
       ))}
     </div>

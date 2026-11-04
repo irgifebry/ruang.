@@ -48,14 +48,20 @@ function ConsentScreen() {
 
   useEffect(() => {
     let active = true;
-    supabaseRef.current.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      if (!data.session) {
+    supabaseRef.current.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        if (!data?.session) {
+          router.replace(`/login?next=${encodeURIComponent(backTo)}`);
+        } else {
+          setReady(true);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
         router.replace(`/login?next=${encodeURIComponent(backTo)}`);
-      } else {
-        setReady(true);
-      }
-    });
+      });
     return () => {
       active = false;
     };
@@ -87,7 +93,7 @@ function ConsentScreen() {
   };
 
   return (
-    <div className="py-[34px] max-w-[640px] mx-auto" id="konten">
+    <div className="py-section max-w-[640px] mx-auto" id="konten">
       <header className="mb-section">
         <h1 className="text-[clamp(34px,4.5vw,52px)] tracking-[-0.065em] leading-[1.12] font-medium mb-[10px]">
           Izinkan <em className="font-normal italic text-ruang-accent-text">akses?</em>

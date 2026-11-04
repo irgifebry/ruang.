@@ -53,7 +53,7 @@ export default function WelcomePage() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <div className="py-[34px] max-w-[1310px] mx-auto" id="konten">
+      <div className="py-section max-w-[1310px] mx-auto" id="konten">
       <header className="flex items-center justify-between gap-[18px]">
         <Brand />
         <div className="flex items-center gap-[10px]">
@@ -66,7 +66,7 @@ export default function WelcomePage() {
         </div>
       </header>
 
-      <section className="pt-[62px] pb-[54px] grid grid-cols-1 lg:grid-cols-[1.06fr_0.94fr] gap-section items-end">
+      <section className="py-section grid grid-cols-1 lg:grid-cols-[1.06fr_0.94fr] gap-section items-end">
         <div>
           <h1 className="text-[clamp(38px,5.4vw,66px)] tracking-[-0.065em] leading-[1.1] font-medium mb-[18px]">
             Atur gaji,
@@ -81,7 +81,7 @@ export default function WelcomePage() {
         <SampleCard summary={summary} />
       </section>
 
-      <section className="border-t border-ruang-line pt-[34px]">
+      <section className="border-t border-ruang-line pt-section">
         <div className="flex flex-wrap items-end justify-between gap-[14px] mb-[26px]">
           <div>
             <Eyebrow>Fitur</Eyebrow>
@@ -197,8 +197,8 @@ export default function WelcomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-ruang-line mt-[34px] py-[20px] flex items-center justify-between gap-[16px]">
-        <Link href="/welcome/help" className="text-[13px] text-ruang-muted hover:text-ruang-accent-text no-underline">Bantuan</Link>
+      <footer className="border-t border-ruang-line mt-section py-[20px] flex items-center justify-between gap-card">
+        <Link href="/welcome/help" className="text-[13px] text-ruang-muted hover:text-ruang-accent-text focus-visible:text-ruang-accent-text focus-visible:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ruang-accent rounded-[2px] no-underline">Bantuan</Link>
       </footer>
     </div>
     </>
@@ -211,7 +211,7 @@ function SampleCard({ summary }) {
       <div className="flex justify-between items-center font-mono text-[11px] tracking-[0.1em] text-ruang-muted uppercase">
         <span>SISA UANG BULAN INI</span>
         <span className="flex items-center gap-[7px] text-ruang-body">
-          <span className="w-[6px] h-[6px] bg-ruang-accent rounded-full shadow-[0_0_9px_#c9fb5570]" /> Contoh data
+          <span className="w-[6px] h-[6px] bg-ruang-accent rounded-full shadow-[0_0_9px_rgb(var(--c-accent)/0.44)]" /> Contoh data
         </span>
       </div>
 

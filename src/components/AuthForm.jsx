@@ -178,7 +178,7 @@ function AuthFormInner({ mode }) {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_390px] items-center gap-[50px] max-w-[940px] mx-auto">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_390px] items-center gap-section max-w-[940px] mx-auto">
       {/* Portalled to `document.body`, so its place here is only about reading
           order — it must come before the form for a screen reader to meet the
           explanation before the fields it explains. */}
@@ -191,15 +191,15 @@ function AuthFormInner({ mode }) {
         data tetap tersimpan — masuk lagi untuk melanjutkan.
       </Toast>
 
-      <h1 className="text-[clamp(39px,6vw,65px)] tracking-[-0.07em] leading-[1.1] font-medium mb-[16px]">
+      <h1 className="text-[clamp(39px,6vw,65px)] tracking-[-0.07em] leading-[1.1] font-medium mb-section">
         {isLogin ? 'Masuk' : 'Buat akun'}
       </h1>
 
-      <form onSubmit={handleSubmit} className="bg-ruang-panel border border-ruang-line p-[24px] w-full">
+      <form onSubmit={handleSubmit} noValidate className="bg-ruang-panel border border-ruang-line p-[24px] w-full">
         {deletionScheduled && (
           <p
             role="status"
-            className="text-[13px] leading-[1.65] text-ruang-warn-text border border-ruang-warn/40 bg-ruang-warn/10 rounded-[4px] px-[13px] py-[11px] mb-[18px]"
+            className="text-[13px] leading-[1.65] text-ruang-warn-text border border-ruang-warn/40 bg-ruang-warn/10 rounded-[4px] px-[13px] py-[11px] mb-card"
           >
             Akun kamu dijadwalkan dihapus dalam 7 hari. Kalau berubah pikiran, masuk dengan akun yang
             sama sekarang — semua data kembali seperti semula.
@@ -207,7 +207,7 @@ function AuthFormInner({ mode }) {
         )}
 
         <div className="flex items-center gap-[8px] font-mono text-[11px] text-ruang-body tracking-[0.05em] uppercase mb-[12px]">
-          <span className="w-[6px] h-[6px] bg-ruang-accent rounded-full shadow-[0_0_9px_#c9fb5570]" />
+          <span className="w-[6px] h-[6px] bg-ruang-accent rounded-full shadow-[0_0_9px_rgb(var(--c-accent)/0.44)]" />
           {isLogin ? 'Masuk' : 'Daftar'}
         </div>
         <h2 className="text-[20px] tracking-[-0.04em] font-medium mb-[20px]">
@@ -274,13 +274,13 @@ function AuthFormInner({ mode }) {
                 minLength={8}
                 required
                 aria-describedby="auth-password-hint"
-                className="w-full h-[40px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[12px] pr-[38px] text-[13px] outline-none focus:border-ruang-accent-text placeholder:text-ruang-ghost"
+                className="w-full h-[40px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[12px] pr-[44px] text-[13px] outline-none focus:border-ruang-accent-text focus-visible:ring-1 focus-visible:ring-ruang-accent placeholder:text-ruang-ghost"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((prev) => !prev)}
                 aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
-                className="absolute right-0 top-0 w-[38px] h-[40px] grid place-items-center text-ruang-subtle hover:text-ruang-accent-text transition-colors"
+                className="absolute right-0 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center text-ruang-subtle hover:text-ruang-accent-text transition-colors"
               >
                 {showPassword ? (
                   <EyeClosedIcon size={16} aria-hidden="true" />

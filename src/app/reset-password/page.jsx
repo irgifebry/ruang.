@@ -105,9 +105,9 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-[65vh] grid place-items-center py-[34px]">
+    <div className="min-h-[65vh] grid place-items-center py-section">
       <div className="w-full max-w-[420px]">
-        <div className="mb-[20px]">
+        <div className="mb-section">
           <h1 className="text-[clamp(30px,5vw,46px)] tracking-[-0.06em] leading-[1.12] font-medium mb-[12px]">
             {mode === 'update' ? (
               <>
@@ -130,7 +130,7 @@ export default function ResetPasswordPage() {
           {!ready ? (
             <p className="text-[13px] text-ruang-muted">Memeriksa tautan...</p>
           ) : mode === 'update' ? (
-            <form onSubmit={handleUpdate} className="flex flex-col gap-[16px]" noValidate>
+            <form onSubmit={handleUpdate} className="flex flex-col gap-card" noValidate>
               <TextField
                 id="new-password"
                 label="Kata sandi baru"
@@ -159,7 +159,7 @@ export default function ResetPasswordPage() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={handleRequest} className="flex flex-col gap-[16px]" noValidate>
+            <form onSubmit={handleRequest} className="flex flex-col gap-card" noValidate>
               <TextField
                 id="reset-email"
                 label="Email"
