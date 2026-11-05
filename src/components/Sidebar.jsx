@@ -137,7 +137,7 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
           onClick={openDrawer}
           aria-label="Buka menu navigasi"
           aria-expanded={drawerOpen}
-          className="w-[38px] h-[38px] grid place-items-center border border-ruang-line-3 rounded-[4px] text-ruang-ink hover:border-ruang-accent-text hover:text-ruang-accent-text transition-colors"
+          className="w-[44px] h-[44px] grid place-items-center border border-ruang-line-3 rounded-[4px] text-ruang-ink hover:border-ruang-accent-text hover:text-ruang-accent-text transition-colors"
         >
           <MenuGlyph />
         </button>
@@ -372,7 +372,7 @@ function UserBlock({ session, onSignOut, signingOut }) {
   const avatarSrc = !resolved
     ? null
     : profile?.avatar_path
-      ? (process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://bqgxiiuaefbnxslzkoek.supabase.co') +
+      ? process.env.NEXT_PUBLIC_SUPABASE_URL +
         '/storage/v1/object/public/avatars/' +
         encodeURI(profile.avatar_path) +
         (version ? `?v=${version}` : '')
@@ -460,7 +460,7 @@ export function SidebarWithSession() {
   const router = useRouter();
 
   useEffect(() => {
-    getSharedSession().then(({ data }) => setSession(data ?? null));
+    getSharedSession().then(({ data }) => setSession(data ?? null)).catch(console.error);
   }, []);
 
   const handleSignOut = async () => {
