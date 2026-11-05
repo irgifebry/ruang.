@@ -178,6 +178,12 @@ export async function reconcileOnSignIn(userId) {
     'SELECT deletion_requested_at FROM profiles WHERE id = $1',
     [userId]
   );
+
+  // No profile row means the account was already purged (purge-race or a
+  // partial signup that never completed). Treat as gone-and-clean so the
+  // hook does not block the sign-in flow for unrelated users.
+  if (rows.length === 0) return 'ok';
+
   const requestedAt = rows[0]?.deletion_requested_at;
   if (!requestedAt) return 'ok';
 

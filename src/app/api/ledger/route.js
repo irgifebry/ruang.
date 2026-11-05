@@ -380,6 +380,24 @@ export async function POST(request) {
       case 'updateBudget': {
         const { id, input } = body;
         if (!validId(id) || !validBudget(input)) return errorResponse('Data kategori tidak valid.');
+
+        // Server-side cap: sum of all other categories plus the new limit must
+        // not exceed salary. Excludes the budget being updated from the sum.
+        const [profileRes, budgetSumRes] = await Promise.all([
+          pool.query('SELECT salary FROM profiles WHERE id = $1', [userId]),
+          pool.query(
+            'SELECT COALESCE(SUM(monthly_limit), 0) AS total FROM budgets WHERE user_id = $1 AND id != $2',
+            [userId, id],
+          ),
+        ]);
+        const salary = toNumber(profileRes.rows[0]?.salary ?? 0);
+        if (salary > 0) {
+          const existing = toNumber(budgetSumRes.rows[0]?.total ?? 0);
+          if (existing + toNumber(input.monthlyLimit) > salary) {
+            return errorResponse('Total anggaran melebihi gaji.', 400);
+          }
+        }
+
         const result = await pool.query(
           `UPDATE budgets
           SET name = $1, monthly_limit = $2, color = $3
