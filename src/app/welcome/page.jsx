@@ -184,7 +184,7 @@ export default function WelcomePage() {
                     <strong className="block text-[13px] font-medium truncate">{expense.description}</strong>
                     <small className="block mt-[4px] text-ruang-muted text-[12px] truncate">
                       {budget?.name} <span className="text-ruang-ghost px-[3px]">·</span>{' '}
-                      {formatMonthLabel(expense.date.slice(0, 7))}
+                      {formatMonthLabel(expense.spent_on.slice(0, 7))}
                     </small>
                   </div>
                   <strong className="font-mono text-[12px] text-ruang-ink whitespace-nowrap flex-none">
