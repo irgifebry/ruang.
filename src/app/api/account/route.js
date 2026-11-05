@@ -231,5 +231,12 @@ export async function POST(request) {
     );
   }
 
+  // Revoke all existing sessions so the newly-added password takes effect
+  // immediately. A session that existed before this call was created without
+  // a password requirement; it must not outlive the moment one was set.
+  await auth.api.revokeSessions({ headers: await headers() }).catch((err) => {
+    console.error('Could not revoke sessions after setPassword:', err);
+  });
+
   return NextResponse.json({ success: true });
 }
