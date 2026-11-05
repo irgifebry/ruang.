@@ -12,7 +12,7 @@ create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   salary numeric(14, 2) not null default 0 check (salary >= 0),
   name text check (name is null or char_length(trim(name)) between 1 and 60),
-  avatar_path text check (avatar_path is null or char_length(avatar_path) <= 300),
+  avatar_path text check (avatar_path is null or avatar_path ~ '^[0-9a-fA-F-]{1,64}/avatar-[0-9a-zA-Z-]{8,36}\.(jpg|jpeg|png|webp|gif)$'),
   theme text not null default 'dark' check (theme in ('dark', 'light', 'system')),
   -- Pending account deletion, not a tombstone. "Hapus akun" only stamps this
   -- and revokes every session; signing in again inside the seven-day window
@@ -57,7 +57,8 @@ create table public.salary_records (
   month date not null,
   amount numeric(14, 2) not null check (amount >= 0),
   updated_at timestamptz not null default now(),
-  primary key (user_id, month)
+  primary key (user_id, month),
+  constraint salary_records_month_start_check check (month = date_trunc('month', month)::date)
 );
 
 comment on table public.salary_records is
@@ -92,6 +93,8 @@ comment on table public.incomes is
 -------------------------------------------------------------------------------
 
 create index budgets_user_id_idx on public.budgets(user_id);
+-- Case-insensitive unique name per user, matching the client-side duplicate check.
+create unique index budgets_user_lower_name_idx on public.budgets(user_id, lower(name));
 create index expenses_user_date_idx on public.expenses(user_id, spent_on desc);
 create index incomes_user_date_idx on public.incomes(user_id, received_on desc);
 -- History aggregates strictly by month, which this serves better than the
