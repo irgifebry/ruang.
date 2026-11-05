@@ -158,7 +158,7 @@ function ProfileContent({ data, reload }) {
     try {
       await updateProfile(supabase, patch);
     } catch {
-      setAvatarError('Perampilan gagal disimpan di server.');
+      setAvatarError('Penampilan gagal disimpan di server.');
     }
   }
 

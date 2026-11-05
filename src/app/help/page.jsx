@@ -27,7 +27,7 @@ const FAQ_GROUPS = [
     items: [
       {
         q: 'Apa yang perlu diatur dulu?',
-        a: 'Buka Pengaturan untuk menyimpan gaji bulanan dan membuat kategori beserta batas anggarannya. Setelah itu, catat pengeluaran lewat halaman Pengeluaran.',
+        a: 'Buka Pengaturan untuk menyimpan gaji bulanan dan membuat kategori beserta batas anggarannya. Setelah itu, catat pengeluaran lewat halaman Transaksi.',
       },
       {
         q: 'Bagaimana cara mencatat pengeluaran?',

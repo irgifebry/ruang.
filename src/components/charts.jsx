@@ -389,7 +389,7 @@ function GranularityToggle({ value, onChange }) {
   ];
 
   return (
-    <div className="flex border border-ruang-line-2 flex-none" role="group" aria-label="Grafik per">
+    <div className="flex border border-ruang-line-2 flex-none" role="group" aria-label="Tampilan grafik: per hari atau per bulan">
       {options.map((option) => {
         const active = option.value === value;
         return (
