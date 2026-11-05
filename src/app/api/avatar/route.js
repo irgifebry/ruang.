@@ -140,22 +140,22 @@ export async function DELETE(request) {
     }
 
     const pool = getPool();
-    const existing = await pool.query(
-      'SELECT id FROM profiles WHERE id = $1 AND avatar_path = $2',
-      [user.id, path],
-    );
-    if (!existing.rowCount) return responseError('Foto tidak ditemukan.', 404);
 
-    const { error } = await storageAdmin().storage.from('avatars').remove([path]);
-    if (error) {
-      console.error('Avatar storage remove failed:', error);
-      return responseError('Gagal menghapus foto.', 500);
-    }
-
-    await pool.query(
+    // DB first. If storage.remove() fails after this succeeds, the file becomes
+    // an orphan in the bucket — acceptable. The reverse (storage gone, DB still
+    // pointing at it) produces a broken avatar image, which is worse.
+    const updated = await pool.query(
       'UPDATE profiles SET avatar_path = NULL WHERE id = $1 AND avatar_path = $2',
       [user.id, path],
     );
+    if (!updated.rowCount) return responseError('Foto tidak ditemukan.', 404);
+
+    const { error } = await storageAdmin().storage.from('avatars').remove([path]);
+    if (error) {
+      // Orphan file is acceptable; the DB pointer is gone.
+      console.error('Avatar storage remove failed (file may be orphaned):', error);
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Avatar delete failed:', error);
