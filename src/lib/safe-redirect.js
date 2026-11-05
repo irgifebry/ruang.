@@ -20,7 +20,7 @@ export function safeRedirectUri(value, origin, fallback = '/') {
   try {
     const url = new URL(value);
     if (url.origin !== origin) return fallback;
-    return `${url.pathname}${url.search}${url.hash}`;
+    return safePath(`${url.pathname}${url.search}${url.hash}`, fallback);
   } catch {
     return fallback;
   }

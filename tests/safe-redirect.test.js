@@ -40,3 +40,7 @@ test('safeRedirectUri keeps an absolute URL only on the same origin', () => {
   assert.equal(safeRedirectUri('not a url', 'https://ruang.test', '/safe'), '/safe');
   assert.equal(safeRedirectUri('', 'https://ruang.test', '/safe'), '/safe');
 });
+
+test('safeRedirectUri blocks //evil open redirect via same-origin URL with double-slash path', () => {
+  assert.equal(safeRedirectUri('https://ruang.test//evil', 'https://ruang.test', '/'), '/');
+});
