@@ -776,7 +776,7 @@ function TransactionsContent({ data, reload }) {
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Cari nama..."
                     aria-label="Cari transaksi"
-                    className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink pl-[32px] pr-[10px] text-[13px] outline-none focus:border-ruang-accent-text placeholder:text-ruang-ghost"
+                    className="w-full h-[44px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink pl-[32px] pr-[10px] text-[13px] outline-none focus:border-ruang-accent-text placeholder:text-ruang-ghost"
                   />
                 </div>
 
@@ -790,7 +790,7 @@ function TransactionsContent({ data, reload }) {
                     value={monthFilter}
                     onChange={(e) => setMonthFilter(e.target.value)}
                     aria-label="Filter bulan"
-                    className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
+                    className="w-full h-[44px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
                   >
                     {monthsWithData.map((key) => (
                       <option key={key} value={key} className="bg-ruang-shell">
@@ -810,7 +810,7 @@ function TransactionsContent({ data, reload }) {
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
                     aria-label="Filter kategori"
-                    className="w-full h-[38px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
+                    className="w-full h-[44px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
                   >
                     <option value="" className="bg-ruang-shell">
                       Semua kategori

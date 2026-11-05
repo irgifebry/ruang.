@@ -235,7 +235,8 @@ export function Button({ children, busy, busyLabel, tone = 'lime', type = 'butto
     <button
       type={type}
       disabled={busy || rest.disabled}
-      className={`h-[42px] px-[18px] flex items-center justify-center gap-[10px] whitespace-nowrap text-[13px] font-bold tracking-[0.02em] rounded-[4px] ${toneClass} transition-colors active:scale-95 disabled:opacity-60 disabled:active:scale-100 ${
+      aria-busy={busy || undefined}
+      className={`h-[44px] px-[18px] flex items-center justify-center gap-[10px] whitespace-nowrap text-[13px] font-bold tracking-[0.02em] rounded-[4px] ${toneClass} transition-colors active:scale-95 disabled:opacity-60 disabled:active:scale-100 ${
         busy ? 'cursor-wait' : ''
       } ${className}`}
       {...rest}
@@ -250,7 +251,7 @@ export function GhostButton({ children, className = '', ...rest }) {
   return (
     <button
       type="button"
-      className={`h-[42px] px-[18px] flex items-center justify-center gap-[10px] whitespace-nowrap text-[13px] font-bold tracking-[0.02em] rounded-[4px] border border-ruang-line-3 text-ruang-ink hover:border-ruang-accent-text hover:text-ruang-accent-text transition-colors active:scale-95 disabled:opacity-60 ${className}`}
+      className={`h-[44px] px-[18px] flex items-center justify-center gap-[10px] whitespace-nowrap text-[13px] font-bold tracking-[0.02em] rounded-[4px] border border-ruang-line-3 text-ruang-ink hover:border-ruang-accent-text hover:text-ruang-accent-text transition-colors active:scale-95 disabled:opacity-60 ${className}`}
       {...rest}
     >
       {children}

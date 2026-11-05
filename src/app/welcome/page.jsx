@@ -171,7 +171,7 @@ export default function WelcomePage() {
 
           <div className="border-t border-ruang-line">
             {recentExpenses.map((expense) => {
-              const budget = initialBudgets.find((item) => item.id === expense.categoryId);
+              const budget = initialBudgets.find((item) => item.id === expense.category_id);
               return (
                 <div key={expense.id} className="flex items-center gap-[12px] py-[13px] border-b border-ruang-line">
                   <span
@@ -255,7 +255,7 @@ function Brand() {
 }
 
 const PRIMARY_BUTTON =
-  'h-[38px] px-[16px] flex items-center text-[13px] font-semibold rounded-[4px] bg-ruang-accent text-ruang-accent-ink hover:bg-ruang-accent-hover transition-colors active:scale-95 no-underline';
+  'h-[44px] px-[16px] flex items-center text-[13px] font-semibold rounded-[4px] bg-ruang-accent text-ruang-accent-ink hover:bg-ruang-accent-hover transition-colors active:scale-95 no-underline';
 
 const SECONDARY_BUTTON =
-  'h-[38px] px-[16px] flex items-center text-[13px] font-semibold rounded-[4px] border border-ruang-line-3 text-ruang-ink hover:border-ruang-accent-text hover:text-ruang-accent-text transition-colors no-underline';
+  'h-[44px] px-[16px] flex items-center text-[13px] font-semibold rounded-[4px] border border-ruang-line-3 text-ruang-ink hover:border-ruang-accent-text hover:text-ruang-accent-text transition-colors no-underline';

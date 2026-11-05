@@ -398,7 +398,7 @@ function GranularityToggle({ value, onChange }) {
             type="button"
             onClick={() => onChange(option.value)}
             aria-pressed={active}
-            className={`h-[28px] px-[12px] text-[11px] font-mono tracking-[0.08em] transition-colors cursor-pointer ${
+            className={`min-h-[44px] px-[12px] text-[11px] font-mono tracking-[0.08em] transition-colors cursor-pointer ${
               active
                 ? 'bg-ruang-accent text-ruang-accent-ink font-semibold'
                 : 'text-ruang-muted hover:text-ruang-ink'

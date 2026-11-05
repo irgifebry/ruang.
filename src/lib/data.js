@@ -10,18 +10,18 @@
 export const initialSalary = 12_500_000;
 
 export const initialBudgets = [
-  { id: 'food', name: 'Makan & minum', limit: 2_400_000, color: 'lime' },
-  { id: 'home', name: 'Tempat tinggal', limit: 3_000_000, color: 'blue' },
-  { id: 'transport', name: 'Transportasi', limit: 1_200_000, color: 'orange' },
-  { id: 'bills', name: 'Tagihan', limit: 950_000, color: 'violet' },
-  { id: 'lifestyle', name: 'Hiburan & gaya hidup', limit: 1_400_000, color: 'pink' },
+  { id: 'food', name: 'Makan & minum', monthly_limit: 2_400_000, color: 'lime' },
+  { id: 'home', name: 'Tempat tinggal', monthly_limit: 3_000_000, color: 'blue' },
+  { id: 'transport', name: 'Transportasi', monthly_limit: 1_200_000, color: 'orange' },
+  { id: 'bills', name: 'Tagihan', monthly_limit: 950_000, color: 'violet' },
+  { id: 'lifestyle', name: 'Hiburan & gaya hidup', monthly_limit: 1_400_000, color: 'pink' },
 ];
 
 export const initialExpenses = [
-  { id: 'e1', description: 'Belanja mingguan', amount: 385_000, categoryId: 'food', date: '2026-10-07' },
-  { id: 'e2', description: 'Kopi dan makan siang', amount: 96_000, categoryId: 'food', date: '2026-10-06' },
-  { id: 'e3', description: 'Kartu transportasi', amount: 250_000, categoryId: 'transport', date: '2026-10-05' },
-  { id: 'e4', description: 'Internet rumah', amount: 350_000, categoryId: 'bills', date: '2026-10-03' },
-  { id: 'e5', description: 'Iuran tempat tinggal', amount: 3_000_000, categoryId: 'home', date: '2026-10-01' },
-  { id: 'e6', description: 'Nonton akhir pekan', amount: 180_000, categoryId: 'lifestyle', date: '2026-10-01' },
+  { id: 'e1', description: 'Belanja mingguan', amount: 385_000, category_id: 'food', spent_on: '2026-10-07' },
+  { id: 'e2', description: 'Kopi dan makan siang', amount: 96_000, category_id: 'food', spent_on: '2026-10-06' },
+  { id: 'e3', description: 'Kartu transportasi', amount: 250_000, category_id: 'transport', spent_on: '2026-10-05' },
+  { id: 'e4', description: 'Internet rumah', amount: 350_000, category_id: 'bills', spent_on: '2026-10-03' },
+  { id: 'e5', description: 'Iuran tempat tinggal', amount: 3_000_000, category_id: 'home', spent_on: '2026-10-01' },
+  { id: 'e6', description: 'Nonton akhir pekan', amount: 180_000, category_id: 'lifestyle', spent_on: '2026-10-01' },
 ];

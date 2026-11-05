@@ -280,7 +280,7 @@ function DashboardContent({ data }) {
             <div
               className="h-[5px] bg-ruang-track rounded-[4px] overflow-hidden"
               role="progressbar"
-              aria-valuenow={Math.min(100, Math.round(summary.allocated ? (summary.spent / summary.allocated) * 100 : 0))}
+              aria-valuenow={Math.round(ratioPercent(summary.spent, summary.allocated))}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-label="Anggaran bulanan terpakai"

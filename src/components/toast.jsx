@@ -109,7 +109,7 @@ export function Toast({
             type="button"
             onClick={() => dismissRef.current?.()}
             aria-label="Tutup notifikasi"
-            className="flex-none -mt-[2px] -mr-[2px] w-[24px] h-[24px] grid place-items-center rounded-[4px] text-ruang-ghost hover:text-ruang-ink hover:bg-ruang-hover transition-colors cursor-pointer"
+            className="flex-none -mt-[2px] -mr-[2px] min-w-[44px] min-h-[44px] grid place-items-center rounded-[4px] text-ruang-ghost hover:text-ruang-ink hover:bg-ruang-hover transition-colors cursor-pointer"
           >
             <CloseIcon size={13} aria-hidden="true" />
           </button>

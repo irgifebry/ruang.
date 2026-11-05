@@ -141,7 +141,7 @@ export default function HistoryPage() {
                         </div>
                         <div className="min-w-0">
                           <small className="block font-mono text-[10px] uppercase tracking-[0.09em] text-ruang-subtle mb-[5px]">
-                            Keluar · {Math.round((row.spent / row.inflow) * 100)}% masuk
+                            Keluar · {Math.round(ratioPercent(row.spent, row.inflow))}% masuk
                           </small>
                           <strong className="block text-[13px] font-medium tracking-[-0.02em] text-ruang-ink truncate">
                             {formatIDR(row.spent)}
