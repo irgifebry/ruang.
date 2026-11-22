@@ -24,7 +24,13 @@ Extra fixes by orchestrator: token validation for reset-password (+ 2 tests),
 /auth/callback docs corrected in AGENTS.md/README/setup.md, scroll-mt token,
 register metadata.
 
-NEXT: minta izin commit + push ke main -> deploy Vercel -> backup tabel -> migration.
+DONE: commit 73ea614 pushed to main. Vercel deployment dpl_7nrhP1Yrd7Egh4KwwZ66gjHLPsRY
+READY (production), smoke test /welcome shows income-only copy, no runtime errors.
+CRON_SECRET created in Vercel (production + preview, sensitive, value not shown).
+Supabase: backup public.salary_records_backup_20261122 (3 rows) created; migration
+20261122_incomes_only applied and verified — salary table/column gone, 3 income
+rows with source 'Gaji', budgets_user_lower_name_idx present, validator search_path=''.
+Remaining user action: set RESEND_API_KEY + EMAIL_FROM in Vercel for password reset email.
 
 Task 2: complete — UI/copy income-only, 49/49 render tests pass
 Task 3: complete — authoritative session (query.disableCookieCache), session.update
