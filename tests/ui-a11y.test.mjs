@@ -135,6 +135,12 @@ test('reset-password puts useSearchParams behind a Suspense boundary', () => {
   assert.match(source, /function ResetPasswordInner\(\)/);
 });
 
+test('reset-password validates email locally with friendly copy', () => {
+  const source = read('../src/app/reset-password/page.jsx');
+  assert.match(source, /Isi alamat email dengan benar\./);
+  assert.ok(!source.includes('[body.email]'), 'a Better Auth field path leaked into the UI');
+});
+
 test('tokens with no consumers were removed from the Tailwind config', () => {
   const config = read('../tailwind.config.cjs');
   for (const token of [

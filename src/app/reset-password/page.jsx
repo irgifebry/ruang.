@@ -57,6 +57,15 @@ function ResetPasswordInner() {
     const form = new FormData(event.target);
     const email = String(form.get('email') ?? '').trim();
 
+    // The form is `noValidate` so the native bubble never appears. Check here
+    // instead of surfacing Better Auth's raw field-path error — that is an
+    // internal field name, not something to show a user.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError('Isi alamat email dengan benar.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error: resetError } = await requestPasswordReset({
         email,
