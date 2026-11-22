@@ -12,6 +12,7 @@ export default function AppShell({ children }) {
   const isBare = BARE_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
+  const isWelcome = pathname === '/welcome';
 
   // On both branches, and deliberately: idle auto-logout is an auth behaviour,
   // not chrome. Mounting it only beside the sidebar left the bare routes
@@ -22,7 +23,9 @@ export default function AppShell({ children }) {
     return (
       <div className="min-h-screen bg-ruang-bg text-ruang-ink flex flex-col justify-center">
         <IdleLogout />
-        <main className="w-full max-w-[1800px] mx-auto px-6 sm:px-12 py-section relative">{children}</main>
+        {isWelcome ? children : (
+          <main className="w-full max-w-[1800px] mx-auto px-6 sm:px-12 py-section relative">{children}</main>
+        )}
       </div>
     );
   }

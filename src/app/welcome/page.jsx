@@ -5,23 +5,24 @@ import { formatIDR, formatMonthLabel, getCashflowSummary, ratioPercent } from '@
 import { ArrowRightUpIcon } from '@/components/icons';
 import BrandMark from '@/components/BrandMark';
 import { Eyebrow } from '@/components/ui';
+import { WELCOME_JSON_LD } from '@/lib/welcome-seo';
 
 export const metadata = {
-  title: 'Atur uang bulananmu',
-  description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+  title: 'Catat Keuangan Pribadi dengan Rapi',
+  description: 'Catat pemasukan dan pengeluaran, susun anggaran, lalu pantau sisa uang setiap bulan dengan ruang.',
   alternates: { canonical: '/welcome' },
   robots: { index: true, follow: true },
   openGraph: {
-    title: 'Atur uang bulananmu · ruang.',
-    description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    title: 'Catat Keuangan Pribadi dengan Rapi · ruang.',
+    description: 'Catat pemasukan dan pengeluaran, susun anggaran, lalu pantau sisa uang setiap bulan dengan ruang.',
     url: '/welcome',
     type: 'website',
     images: ['/opengraph-image'],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Atur uang bulananmu · ruang.',
-    description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    title: 'Catat Keuangan Pribadi dengan Rapi · ruang.',
+    description: 'Catat pemasukan dan pengeluaran, susun anggaran, lalu pantau sisa uang setiap bulan dengan ruang.',
     images: ['/opengraph-image'],
   },
 };
@@ -38,21 +39,10 @@ export default function WelcomePage() {
   const summary = getCashflowSummary(initialIncomes, initialBudgets, initialExpenses);
   const recentExpenses = initialExpenses.slice(0, 5);
 
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'WebApplication',
-    name: 'ruang.',
-    url: 'https://ruang-cashflow.vercel.app/welcome',
-    description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
-    applicationCategory: 'FinanceApplication',
-    operatingSystem: 'Web',
-    inLanguage: 'id',
-    offers: { '@type': 'Offer', price: 0, priceCurrency: 'IDR' },
-  };
-
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(WELCOME_JSON_LD) }} />
+      <main className="w-full max-w-[1800px] mx-auto px-6 sm:px-12 py-section relative">
       <div className="py-section max-w-[1310px] mx-auto" id="konten">
       <header className="flex items-center justify-between gap-[18px]">
         <Brand />
@@ -200,7 +190,8 @@ export default function WelcomePage() {
       <footer className="border-t border-ruang-line mt-section py-[20px] flex items-center justify-between gap-card">
         <Link href="/welcome/help" className="text-[13px] text-ruang-muted hover:text-ruang-accent-text focus-visible:text-ruang-accent-text focus-visible:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ruang-accent rounded-[2px] no-underline">Bantuan</Link>
       </footer>
-    </div>
+      </div>
+      </main>
     </>
   );
 }

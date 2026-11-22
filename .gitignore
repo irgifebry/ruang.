@@ -21,6 +21,12 @@ coverage/
 # Google OAuth client credentials, downloaded from Cloud Console
 client_secret_*.json
 
+# Agent and generated planning context
+.agents/
+.superpowers/
+docs/
+AGENTS.md
+
 # Editor / OS noise
 .DS_Store
 Thumbs.db

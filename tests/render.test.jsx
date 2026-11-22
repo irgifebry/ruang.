@@ -22,6 +22,36 @@ import React from 'react';
 import { formatIDR, getBudgetSummary, formatMonthLabel } from '../src/lib/money.js';
 import { buildHistoryRows } from '../src/lib/ledger.js';
 
+test('welcome page serializes valid WebApplication JSON-LD outside main', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { WELCOME_JSON_LD } = await import('../src/lib/welcome-seo.js');
+  const source = await readFile(new URL('../src/app/welcome/page.jsx', import.meta.url), 'utf8');
+  const shell = await readFile(new URL('../src/components/AppShell.jsx', import.meta.url), 'utf8');
+
+  assert.match(source, /title: 'Catat Keuangan Pribadi dengan Rapi'/);
+  assert.match(source, /canonical: '\/welcome'/);
+  assert.match(source, /robots: \{ index: true, follow: true \}/);
+  assert.match(source, /openGraph: \{/);
+  assert.match(source, /twitter: \{/);
+  assert.match(shell, /isWelcome \? children/);
+
+  assert.equal(WELCOME_JSON_LD['@context'], 'https://schema.org');
+  assert.equal(WELCOME_JSON_LD['@type'], 'WebApplication');
+  assert.equal(WELCOME_JSON_LD.name, 'ruang.');
+  assert.equal(WELCOME_JSON_LD.url, 'https://ruang-cashflow.vercel.app/welcome');
+  assert.ok(WELCOME_JSON_LD.description.includes('pemasukan'));
+  assert.equal(WELCOME_JSON_LD.applicationCategory, 'FinanceApplication');
+  assert.equal(WELCOME_JSON_LD.operatingSystem, 'Web');
+  assert.equal(WELCOME_JSON_LD.inLanguage, 'id');
+  assert.deepEqual(WELCOME_JSON_LD.offers, { '@type': 'Offer', price: 0, priceCurrency: 'IDR' });
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify(WELCOME_JSON_LD)));
+
+  const scriptIndex = source.indexOf('<script type="application/ld+json"');
+  const mainStart = source.indexOf('<main');
+  assert.notEqual(scriptIndex, -1, 'JSON-LD script should be present');
+  assert.ok(scriptIndex < mainStart, 'JSON-LD must be rendered before <main>');
+});
+
 const {
   ExpenseList,
   ExpenseRow,
