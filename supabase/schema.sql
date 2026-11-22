@@ -123,15 +123,17 @@ comment on column public.profiles.deletion_requested_at is
   'Kapan pengguna meminta penghapusan akun. NULL = akun utuh. Diisi = semua sesi dicabut dan akun dihapus permanen setelah 7 hari, kecuali pengguna masuk lagi sebelum itu.';
 
 -- Envelope categories chosen by the user. There is no salary-derived cap:
--- `monthly_limit` is whatever the user decides, and deleting a category
--- cascades to its expenses.
+-- `monthly_limit` is whatever the user decides. Removing a category sets
+-- `archived_at` rather than deleting the row: the label still belongs to past
+-- expenses, while the category disappears from pickers and totals.
 create table public.budgets (
   id uuid primary key default gen_random_uuid(),
   user_id text not null references public."user"(id) on delete cascade,
   name text not null check (char_length(trim(name)) between 1 and 60),
   monthly_limit numeric(14, 2) not null default 0 check (monthly_limit >= 0),
   color text not null default 'lime' check (color in ('lime', 'blue', 'orange', 'violet', 'pink')),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  archived_at timestamptz
 );
 
 comment on table public.budgets is
@@ -181,7 +183,7 @@ create index verification_identifier_idx on public."verification"(identifier);
 create index budgets_user_id_idx on public.budgets(user_id);
 -- Case-insensitive unique name per user, matching the client-side duplicate
 -- check. The deployed database only gained this in 20261122_incomes_only.sql.
-create unique index budgets_user_lower_name_idx on public.budgets(user_id, lower(name));
+create unique index budgets_user_active_lower_name_idx on public.budgets(user_id, lower(name)) where archived_at is null;
 create index expenses_user_date_idx on public.expenses(user_id, spent_on desc);
 -- History aggregates strictly by month, which this serves better than the
 -- composite index above.

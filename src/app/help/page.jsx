@@ -57,7 +57,7 @@ const FAQ_GROUPS = [
     items: [
       {
         q: 'Apa yang terjadi kalau kategori dihapus?',
-        a: 'Semua transaksi dalam kategori itu ikut terhapus. Sebelum menghapus, ruang. menampilkan jumlah transaksi yang terdampak agar kamu bisa memastikan pilihan.',
+        a: 'Transaksinya tetap tersimpan dan tetap menampilkan nama kategori lama. Kategori itu hanya hilang dari daftar dan tidak bisa dipakai untuk catatan baru; nama yang sama boleh dipakai lagi untuk kategori baru.',
       },
       {
         q: 'Bisa menghubungkan rekening bank?',

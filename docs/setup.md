@@ -216,9 +216,10 @@ diawali `//` atau URL penuh, dan `AuthForm` melakukan hal yang sama pada
 `callbackURL` Google, supaya parameter tidak bisa dipakai sebagai open redirect.
 Rute `/auth/callback` tidak ikut memvalidasi — ia hanya mengalihkan ke `/login`.
 
-**Kategori yang dihapus ikut menghapus transaksinya.** Ini perilaku cascade di
-skema. Dialog konfirmasi karena itu menyebutkan jumlah transaksi yang akan ikut
-hilang, dan menjelaskan bahwa riwayat bulan berjalan ikut berubah.
+**Menghapus kategori tidak menghapus transaksinya.** Kategori hanya diarsipkan
+(`budgets.archived_at`), jadi hilang dari daftar dan tidak bisa dipakai untuk
+catatan baru, tetapi transaksi lama tetap menampilkan nama kategori itu. Nama
+yang sama boleh dipakai lagi untuk kategori baru.
 
 **Masuk lagi adalah satu-satunya cara membatalkan penghapusan akun.** Account
 deletion sengaja tidak punya tombol " Batal" di halaman mana pun: begitu

@@ -235,7 +235,13 @@ scripts/
   bucket forever. It is scheduled by `vercel.json` and authenticated with
   `CRON_SECRET`; unset, the route refuses every call and nothing is ever
   actually destroyed.
-- **Category deletion cascades to transactions** (schema-level `ON DELETE CASCADE`).
+- **Removing a category archives it instead of deleting the row.** `deleteBudget`
+  sets `budgets.archived_at`; every budget read filters `archived_at IS NULL`, so
+  an archived category disappears from pickers and allocation totals. Its row
+  stays, which is how past expenses keep their category name — the expense
+  `JOIN budgets` still resolves the label. The old `ON DELETE CASCADE` remains
+  only as a safety net for account purges. The name-level unique index is
+  partial on active rows, so an archived name can be reused.
 - **A month appears in history only if it has an income or an expense.** New
   accounts get no placeholder rows, so an empty account has an empty history.
 

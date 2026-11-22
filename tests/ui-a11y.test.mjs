@@ -135,6 +135,15 @@ test('reset-password puts useSearchParams behind a Suspense boundary', () => {
   assert.match(source, /function ResetPasswordInner\(\)/);
 });
 
+test('removing a category archives it so past transactions keep their name', () => {
+  const api = read('../src/app/api/ledger/route.js');
+  assert.match(api, /UPDATE budgets SET archived_at = now\(\)/);
+  assert.ok(!api.includes('DELETE FROM budgets WHERE id = $1 AND user_id = $2'));
+  assert.match(api, /archived_at IS NULL/);
+  assert.match(read('../src/app/settings/page.jsx'), /tetap tersimpan dengan nama kategori/);
+  assert.match(read('../supabase/migrations/20261122_archive_budgets.sql'), /add column if not exists archived_at/);
+});
+
 test('select fields use an inset caret instead of the native edge-aligned one', () => {
   const source = read('../src/components/form.jsx');
   assert.match(source, /appearance-none pr-\[34px\]/);

@@ -109,7 +109,7 @@ export async function POST(request) {
       case 'fetchLedger': {
         const [profileRes, budgetsRes, expensesRes, incomesRes] = await Promise.all([
           pool.query(PROFILE_SELECT, [userId]),
-          pool.query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY created_at ASC', [userId]),
+          pool.query('SELECT * FROM budgets WHERE user_id = $1 AND archived_at IS NULL ORDER BY created_at ASC', [userId]),
           pool.query(
             `SELECT 
               e.id, 
@@ -167,7 +167,7 @@ export async function POST(request) {
         const windowStart = `${oldestMonth}-01`;
 
         const [budgetsRes, expensesRes, incomesRes] = await Promise.all([
-          pool.query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY created_at ASC', [userId]),
+          pool.query('SELECT * FROM budgets WHERE user_id = $1 AND archived_at IS NULL ORDER BY created_at ASC', [userId]),
           pool.query(
             `SELECT 
               e.id, 
@@ -245,7 +245,7 @@ export async function POST(request) {
         const result = await pool.query(
           `INSERT INTO expenses (id, user_id, category_id, description, amount, spent_on)
           SELECT $1, $2, b.id, $4, $5, $6
-          FROM budgets b WHERE b.id = $3 AND b.user_id = $2
+          FROM budgets b WHERE b.id = $3 AND b.user_id = $2 AND b.archived_at IS NULL
           RETURNING id`,
           [id, userId, input.categoryId, input.description.trim(), input.amount, input.spentOn]
         );
@@ -260,7 +260,7 @@ export async function POST(request) {
           `UPDATE expenses
           SET category_id = $1, description = $2, amount = $3, spent_on = $4
           WHERE id = $5 AND user_id = $6
-            AND EXISTS (SELECT 1 FROM budgets WHERE id = $1 AND user_id = $6)`,
+            AND EXISTS (SELECT 1 FROM budgets WHERE id = $1 AND user_id = $6 AND archived_at IS NULL)`,
           [input.categoryId, input.description.trim(), input.amount, input.spentOn, id, userId]
         );
         if (!result.rowCount) return errorResponse('Pengeluaran atau kategori tidak ditemukan.', 404);
@@ -336,7 +336,7 @@ export async function POST(request) {
         const result = await pool.query(
           `UPDATE budgets
           SET name = $1, monthly_limit = $2, color = $3
-          WHERE id = $4 AND user_id = $5`,
+          WHERE id = $4 AND user_id = $5 AND archived_at IS NULL`,
           [input.name.trim(), input.monthlyLimit, input.color, id, userId]
         );
         if (!result.rowCount) return errorResponse('Kategori tidak ditemukan.', 404);
@@ -346,7 +346,13 @@ export async function POST(request) {
       case 'deleteBudget': {
         const { id } = body;
         if (!validId(id)) return errorResponse('ID kategori tidak valid.');
-        const result = await pool.query('DELETE FROM budgets WHERE id = $1 AND user_id = $2', [id, userId]);
+        // Archive instead of DELETE: the row is the category label on past
+        // expenses, so removing it used to cascade away those transactions.
+        const result = await pool.query(
+          `UPDATE budgets SET archived_at = now()
+           WHERE id = $1 AND user_id = $2 AND archived_at IS NULL`,
+          [id, userId]
+        );
         if (!result.rowCount) return errorResponse('Kategori tidak ditemukan.', 404);
         return NextResponse.json({ success: true });
       }

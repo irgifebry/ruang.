@@ -105,8 +105,8 @@ function SettingsContent({ data, reload }) {
     return confirm({
       title: `Hapus kategori "${budget.name}"?`,
       description: count
-        ? `${count} transaksi akan ikut terhapus permanen. Riwayat bulan ini ikut berubah dan tidak bisa dikembalikan.`
-        : 'Kategori ini belum punya transaksi, jadi tidak ada data yang hilang.',
+        ? `${count} transaksi tetap tersimpan dengan nama kategori "${budget.name}". Kategori ini hanya hilang dari daftar dan tidak bisa dipakai untuk transaksi baru.`
+        : 'Kategori ini belum punya transaksi. Ia akan hilang dari daftar, dan nama yang sama bisa dipakai lagi.',
       confirmLabel: 'Hapus kategori',
       onConfirm: async () => {
         if (editingId === budget.id) cancelEdit();
@@ -114,7 +114,7 @@ function SettingsContent({ data, reload }) {
         const ok = await run(() => deleteBudget(budget.id));
         if (!ok) return false;
 
-        setSuccess('Kategori dihapus.');
+        setSuccess('Kategori dihapus dari daftar. Transaksinya tetap tersimpan.');
         reload();
         return true;
       },

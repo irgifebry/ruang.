@@ -209,7 +209,7 @@ test('ConfirmDialog keeps its description text on its own lines', () => {
     React.createElement(ConfirmDialog, {
       open: true,
       title: 'Hapus kategori "Makan"?',
-      description: '3 transaksi ikut terhapus.\n\nTidak bisa dikembalikan.',
+      description: '3 transaksi tetap tersimpan dengan nama kategori lama.\n\nKategori hilang dari daftar.',
     }),
   );
 
