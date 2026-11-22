@@ -338,7 +338,7 @@ function TransactionsContent({ data, reload }) {
 
         setFormValue({ ...blank, ...kept });
         setFieldErrors({});
-        setSuccess('Tersimpan. Lanjut catat yang berikutnya.');
+        setSuccess('Tersimpan. Isi catatan berikutnya di form ini.');
         return;
       }
 
@@ -650,20 +650,19 @@ function TransactionsContent({ data, reload }) {
 
               <FormMessage error={mutationError} success={success} />
 
-              {/* `flex-wrap` so a nowrap label on a narrow phone drops the cancel button to
-                its own line instead of squeezing the label into two.
+              {/* `flex-wrap` so a nowrap label on a narrow phone drops the secondary
+                button to its own line instead of squeezing the label into two.
 
                 Both buttons carry the same `flex-1 basis-[160px]`, which is what makes
-                the row read as one pair. The labels here are long enough that the two
-                never fit side by side on a phone — "Simpan transaksi" plus an icon
-                needs ~173px and "Simpan, lanjut" ~134px, against ~293px of panel width
-                — so the secondary used to wrap and then, being `flex-none`, sit on its
-                own line hugging its own width under a full-width primary. Growing like
-                the primary means a wrapped row is two equal full-width buttons, and an
-                unwrapped one is two equal halves. */}
+                the row read as one pair: a wrapped row becomes two equal full-width
+                buttons, an unwrapped one two equal halves.
+
+                The labels spell out the difference the old "Simpan, lanjut" hid:
+                one finishes and closes the dialog, the other keeps it open for the
+                next row. Both save; only the follow-up differs. */}
               <div className="flex flex-wrap gap-[9px] items-center">
                 <Button type="submit" busy={busy} busyLabel="Menyimpan..." className="flex-1 basis-[160px]">
-                  {editing ? 'Simpan perubahan' : 'Simpan transaksi'}
+                  {editing ? 'Simpan perubahan' : 'Simpan & selesai'}
                   <ArrowRightUpIcon size={15} aria-hidden="true" />
                 </Button>
                 {/* The secondary save. Not shown while editing, where "keep
@@ -675,7 +674,7 @@ function TransactionsContent({ data, reload }) {
                     disabled={busy}
                     className="flex-1 basis-[160px]"
                   >
-                    Simpan, lanjut
+                    Simpan & catat lagi
                   </GhostButton>
                 )}
                 {editing && (
