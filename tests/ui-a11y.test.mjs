@@ -135,6 +135,14 @@ test('reset-password puts useSearchParams behind a Suspense boundary', () => {
   assert.match(source, /function ResetPasswordInner\(\)/);
 });
 
+test('select fields use an inset caret instead of the native edge-aligned one', () => {
+  const source = read('../src/components/form.jsx');
+  assert.match(source, /appearance-none pr-\[34px\]/);
+  assert.match(source, /AltArrowDownIcon/);
+  assert.match(source, /right-\[12px\]/);
+  assert.ok(read('../src/components/icons.jsx').includes('alt-arrow-down'));
+});
+
 test('reset-password validates email locally with friendly copy', () => {
   const source = read('../src/app/reset-password/page.jsx');
   assert.match(source, /Isi alamat email dengan benar\./);

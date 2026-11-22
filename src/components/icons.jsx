@@ -16,6 +16,7 @@ export { LoaderIcon } from '@solar-icons/react/bold/loader';
 export { DangerCircleIcon } from '@solar-icons/react/bold/danger-circle';
 export { ArrowRightUpIcon } from '@solar-icons/react/bold/arrow-right-up';
 export { ArrowDownIcon } from '@solar-icons/react/bold/arrow-down';
+export { AltArrowDownIcon } from '@solar-icons/react/bold/alt-arrow-down';
 export { ArrowRightIcon } from '@solar-icons/react/bold/arrow-right';
 export { ArrowLeftIcon } from '@solar-icons/react/bold/arrow-left';
 export { CircleDotIcon } from '@solar-icons/react/bold/circle-dot';

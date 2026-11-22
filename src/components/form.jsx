@@ -2,6 +2,7 @@
 
 import { useId } from 'react';
 import { formatDigits } from '@/lib/money';
+import { AltArrowDownIcon } from './icons';
 
 /**
  * Form primitives.
@@ -189,24 +190,35 @@ export function SelectField({
 
   return (
     <Field label={label} error={error} hint={hint} htmlFor={id}>
-      <select
-        {...controlProps(id, error, describedBy)}
-        value={value}
-        onChange={onChange}
-        className={`${INPUT_BASE} ${borderFor(error)} text-[13px] text-ruang-ink cursor-pointer`}
-        {...rest}
-      >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value} className="bg-ruang-shell">
-            {option.label}
-          </option>
-        ))}
-      </select>
+      {/* The native caret hugs the border and reads as cramped next to the
+          11px field padding. Draw our own so it can sit inside the field with
+          the same breathing room as the text, while the select itself stays a
+          real <select> for keyboard and screen-reader behaviour. */}
+      <div className="relative">
+        <select
+          {...controlProps(id, error, describedBy)}
+          value={value}
+          onChange={onChange}
+          className={`${INPUT_BASE} ${borderFor(error)} appearance-none pr-[34px] text-[13px] text-ruang-ink cursor-pointer`}
+          {...rest}
+        >
+          {placeholder && (
+            <option value="" disabled>
+              {placeholder}
+            </option>
+          )}
+          {options.map((option) => (
+            <option key={option.value} value={option.value} className="bg-ruang-shell">
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <AltArrowDownIcon
+          size={12}
+          aria-hidden="true"
+          className="absolute right-[12px] top-1/2 -translate-y-1/2 text-ruang-subtle pointer-events-none"
+        />
+      </div>
     </Field>
   );
 }
