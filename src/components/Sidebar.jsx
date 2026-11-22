@@ -158,7 +158,7 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
             role="dialog"
             aria-modal="true"
             aria-label="Menu navigasi"
-            className={`${drawerOpen ? 'drawer-in' : 'drawer-out'} absolute inset-y-0 right-0 w-[272px] max-w-[85vw] bg-ruang-shell border-l border-ruang-line p-[20px] flex flex-col`}
+            className={`sidebar-drawer ${drawerOpen ? 'drawer-in' : 'drawer-out'} absolute inset-y-0 right-0 w-[272px] max-w-[85vw] bg-ruang-shell border-l border-ruang-line p-[20px] flex flex-col`}
             aria-hidden={!drawerOpen}
             inert={!drawerOpen}
           >

@@ -32,6 +32,14 @@
     transform: translateY(0) scale(1);
   }
 
+  /* The desktop rail gets its padding from the collapse rules below, which
+     animate `padding-left`. The mobile drawer is a different surface and had
+     none at all, so the active row's highlight butted straight up against the
+     icon. Keep this scoped to the drawer so the rail's transition is untouched. */
+  .sidebar-drawer .sidebar-item {
+    padding-inline: 10px;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .account-menu {
       transform: none;

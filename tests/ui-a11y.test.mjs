@@ -135,6 +135,12 @@ test('reset-password puts useSearchParams behind a Suspense boundary', () => {
   assert.match(source, /function ResetPasswordInner\(\)/);
 });
 
+test('drawer nav rows pad the active highlight away from the icon', () => {
+  const css = read('../src/app/globals.css');
+  assert.match(css, /\.sidebar-drawer \.sidebar-item \{\s*padding-inline: 10px;/);
+  assert.match(read('../src/components/Sidebar.jsx'), /sidebar-drawer \$\{/);
+});
+
 test('removing a category archives it so past transactions keep their name', () => {
   const api = read('../src/app/api/ledger/route.js');
   assert.match(api, /UPDATE budgets SET archived_at = now\(\)/);
