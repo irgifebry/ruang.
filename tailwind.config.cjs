@@ -36,6 +36,11 @@ module.exports = {
         card: '16px',
         section: '32px',
         sidebar: 'var(--sidebar-w)',
+        // The fixed mobile bar's height, from the same `--mobile-bar-h` the bar
+        // itself uses. `mobile-bar-scroll` adds 14px of breathing room for
+        // anchors that have to clear the bar (e.g. settings' section headings).
+        'mobile-bar': 'var(--mobile-bar-h)',
+        'mobile-bar-scroll': 'calc(var(--mobile-bar-h) + 14px)',
       },
 
       colors: {
@@ -47,7 +52,6 @@ module.exports = {
         'ruang-raised': 'rgb(var(--c-raised) / <alpha-value>)',
         'ruang-sunken': 'rgb(var(--c-sunken) / <alpha-value>)',
         'ruang-hover': 'rgb(var(--c-hover) / <alpha-value>)',
-        'ruang-bubble': 'rgb(var(--c-bubble) / <alpha-value>)',
         'ruang-overlay': 'rgb(var(--c-overlay) / <alpha-value>)',
 
         // Hairlines and separators.
@@ -68,7 +72,6 @@ module.exports = {
         // theme variants exist, so `globals.css` resolves these off the
         // `theme-light` class and no JavaScript rewrites them.
         'ruang-accent': 'rgb(var(--c-accent) / <alpha-value>)',
-        'ruang-accent-soft': 'rgb(var(--c-accent) / 0.08)',
         'ruang-accent-hover': 'rgb(var(--c-accent-hover) / <alpha-value>)',
         'ruang-accent-ink': 'rgb(var(--c-accent-ink) / <alpha-value>)',
         // Accent as readable *text*. Split from `ruang-accent` because a bright
@@ -85,14 +88,6 @@ module.exports = {
         // without having gone negative. Same fill/text split as the accent.
         'ruang-warn': 'rgb(var(--c-warn) / <alpha-value>)',
         'ruang-warn-text': 'rgb(var(--c-warn-text) / <alpha-value>)',
-
-        // The five category colours. A per-budget label rather than an
-        // appearance setting, so they stay literal instead of following the
-        // accent token.
-        'cat-blue': '#70c8ff',
-        'cat-orange': '#ffad6b',
-        'cat-violet': '#c1a0ff',
-        'cat-pink': '#ff92bd',
       },
       fontFamily: {
         sans: ['var(--font-space)', 'sans-serif'],

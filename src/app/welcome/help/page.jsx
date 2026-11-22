@@ -24,11 +24,11 @@ export const metadata = {
 const FAQ = [
   {
     q: 'Apa itu ruang.?',
-    a: 'ruang. membantu kamu mengatur gaji bulanan, membuat anggaran kategori, dan mencatat pengeluaran.',
+    a: 'ruang. membantu kamu mencatat pemasukan, membuat anggaran kategori, dan mencatat pengeluaran.',
   },
   {
     q: 'Bagaimana cara mulai?',
-    a: 'Buat akun, simpan gaji bulanan, lalu tambahkan kategori dan batas anggaran. Setelah itu, catat pengeluaranmu.',
+    a: 'Buat akun, catat pemasukan di halaman Transaksi, lalu tambahkan kategori dan batas anggaran di Pengaturan. Setelah itu, catat pengeluaranmu.',
   },
   {
     q: 'Apakah ruang. terhubung ke rekening bank?',

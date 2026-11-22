@@ -16,6 +16,8 @@ import {
   TAU,
   arcPath,
   buildDonutSlices,
+  cashflowByMonth,
+  cashflowPeak,
   niceCeiling,
   polarToCartesian,
   spendByDay,
@@ -332,4 +334,116 @@ test('spendByMonth drops months older than the window', () => {
 test('spendByMonth survives no arguments at all', () => {
   assert.deepEqual(spendByMonth(), []);
   assert.deepEqual(spendByMonth([], '', 6), []);
+});
+
+// ---------------------------------------------------------------------------
+// cashflowByMonth
+//
+// The series has exactly one money-in figure: the sum of `incomes`. There is no
+// second funding source to split out, so no `salary`/`extra` fields either.
+// ---------------------------------------------------------------------------
+
+const cashIncome = (received_on, amount) => ({ received_on, amount });
+const cashExpense = (spent_on, amount) => ({ spent_on, amount });
+
+test('cashflowByMonth counts recorded income as the only inflow', () => {
+  const series = cashflowByMonth(
+    [cashIncome('2026-08-15', 3_000_000), cashIncome('2026-08-20', 2_000_000)],
+    [cashExpense('2026-08-03', 1_000_000)],
+    '2026-08',
+    1,
+  );
+
+  assert.deepEqual(series, [
+    { key: '2026-08', label: 'Agu', inflow: 5_000_000, outflow: 1_000_000, net: 4_000_000 },
+  ]);
+  assert.equal('salary' in series[0], false);
+  assert.equal('extra' in series[0], false);
+});
+
+test('cashflowByMonth keeps a fixed oldest-first window with zero rows', () => {
+  const series = cashflowByMonth([], [], '2026-10', 6);
+
+  assert.deepEqual(
+    series.map((row) => row.key),
+    ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'],
+  );
+  assert.equal(series.length, 6);
+  assert.equal(series[0].inflow, 0);
+  assert.equal(series[0].outflow, 0);
+  assert.equal(series[5].net, 0);
+});
+
+test('cashflowByMonth puts each row in the month its date belongs to', () => {
+  const series = cashflowByMonth(
+    [cashIncome('2026-09-30', 300_000)],
+    [cashExpense('2026-10-01', 100_000)],
+    '2026-10',
+    2,
+  );
+
+  assert.equal(series[0].key, '2026-09');
+  assert.equal(series[0].inflow, 300_000);
+  assert.equal(series[0].outflow, 0);
+  assert.equal(series[0].net, 300_000);
+  assert.equal(series[1].key, '2026-10');
+  assert.equal(series[1].inflow, 0);
+  assert.equal(series[1].outflow, 100_000);
+  assert.equal(series[1].net, -100_000);
+});
+
+test('cashflowByMonth drops rows outside the window and ones with bad dates', () => {
+  const series = cashflowByMonth(
+    [cashIncome('2026-01-10', 9_000_000), cashIncome('bukan tanggal', 9_000_000)],
+    [cashExpense('2026-04-10', 9_000_000), cashExpense(undefined, 9_000_000)],
+    '2026-10',
+    3,
+  );
+
+  assert.deepEqual(series.map((row) => row.key), ['2026-08', '2026-09', '2026-10']);
+  assert.equal(series.every((row) => row.inflow === 0 && row.outflow === 0), true);
+});
+
+test('cashflowByMonth coerces string amounts and ignores junk', () => {
+  const series = cashflowByMonth(
+    [cashIncome('2026-10-01', '250000'), cashIncome('2026-10-01', 'abc')],
+    [cashExpense('2026-10-01', -5)],
+    '2026-10',
+    1,
+  );
+
+  assert.equal(series[0].inflow, 250_000);
+  assert.equal(series[0].outflow, 0);
+});
+
+test('cashflowByMonth survives no arguments and bad ones', () => {
+  assert.deepEqual(cashflowByMonth(), []);
+  assert.deepEqual(cashflowByMonth([], [], '', 6), []);
+  assert.deepEqual(cashflowByMonth([], [], '2026-10', 0), []);
+  assert.equal(cashflowByMonth('x', 'y', '2026-10', 3).length, 3);
+  assert.equal(cashflowByMonth(null, null, '2026-10', -3).length, 0);
+});
+
+test('cashflowPeak is the largest bar in either series', () => {
+  const series = [
+    { inflow: 1_000_000, outflow: 500_000 },
+    { inflow: 2_000_000, outflow: 7_000_000 },
+    { inflow: 0, outflow: 300_000 },
+  ];
+
+  // The outflow bar, not the inflow maximum, so the two rows share one scale.
+  assert.equal(cashflowPeak(series), 7_000_000);
+});
+
+test('cashflowPeak is 0 for an empty or all-zero series', () => {
+  assert.equal(cashflowPeak(), 0);
+  assert.equal(cashflowPeak([]), 0);
+  assert.equal(cashflowPeak('not-an-array'), 0);
+  assert.equal(cashflowPeak([{ inflow: 0, outflow: 0 }]), 0);
+});
+
+test('cashflowPeak coerces string amounts and ignores negatives', () => {
+  assert.equal(cashflowPeak([{ inflow: '4.500.000' }]), 0);
+  assert.equal(cashflowPeak([{ inflow: '4500000' }]), 4_500_000);
+  assert.equal(cashflowPeak([{ inflow: -9_000_000, outflow: -1 }]), 0);
 });

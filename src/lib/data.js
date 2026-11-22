@@ -1,13 +1,16 @@
 /**
  * Sample data for the signed-out welcome page only.
  *
- * This is a fixed illustration, not a seed for the database: new accounts get
- * their five categories from the `on_auth_user_created` trigger instead. Nothing
- * in the authenticated app reads from this file — it exists so the marketing
- * page can show realistic-looking numbers without an account.
+ * This is a fixed illustration, not a seed for the database: new accounts start
+ * empty and name their own categories. Nothing in the authenticated app reads
+ * from this file — it exists so the marketing page can show realistic-looking
+ * numbers without an account.
  */
 
-export const initialSalary = 12_500_000;
+export const initialIncomes = [
+  { id: 'i1', description: 'Pemasukan bulanan', amount: 12_500_000, received_on: '2026-10-01', source: 'Utama' },
+  { id: 'i2', description: 'Bonus proyek', amount: 1_500_000, received_on: '2026-10-08', source: 'Bonus' },
+];
 
 export const initialBudgets = [
   { id: 'food', name: 'Makan & minum', monthly_limit: 2_400_000, color: 'lime' },

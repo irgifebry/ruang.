@@ -1,7 +1,7 @@
 # ruang.
 
-Rencana keuangan pribadi: ubah gaji bulanan jadi anggaran yang bisa dipantau, lalu
-catat setiap pengeluaran terhadapnya.
+Rencana keuangan pribadi: catat pemasukan dan pengeluaran, susun anggaran per
+kategori, lalu pantau sisa uangnya.
 
 **Next.js 16 (App Router) · React 19 · Better Auth · Supabase (Postgres) · Tailwind CSS 3**
 
@@ -9,16 +9,21 @@ catat setiap pengeluaran terhadapnya.
 
 ## Fitur
 
-- **Ringkasan** — sisa anggaran bulan berjalan, pengeluaran per kategori, grafik.
-- **Transaksi** — tambah, ubah, hapus, filter per bulan dan kategori.
-- **Riwayat** — 12 bulan terakhir dari data nyata, bukan data contoh.
-- **Gaji per bulan** — setiap bulan berdiri sendiri di `salary_records`; menyimpan
-  Oktober tidak mengubah September.
-- **Kategori** — dibuat sendiri oleh pengguna; **akun baru tidak memakai template**.
+- **Ringkasan** — sisa uang (pemasukan dikurangi pengeluaran), pengeluaran per
+  kategori, grafik.
+- **Transaksi** — tambah, ubah, hapus, filter pemasukan dan pengeluaran per bulan
+  dan kategori.
+- **Riwayat** — 12 bulan terakhir dari data nyata, bukan data contoh; sebuah bulan
+  muncul bila ada pemasukan atau pengeluaran.
+- **Pemasukan** — satu pencatatan di `incomes`: deskripsi, sumber opsional berupa
+  teks bebas, nominal, dan tanggal. Tidak ada angka tetap bulanan yang jadi
+  acuan anggaran.
+- **Kategori** — amplop anggaran dibuat sendiri oleh pengguna; **akun baru tidak
+  memakai template**.
 - **Profil** — nama, avatar (Supabase Storage), tema (`dark` / `light` / `system`).
 - **Masuk dengan Google** — opsional, aktif hanya bila `AUTH_GOOGLE_ID` **dan**
   `AUTH_GOOGLE_SECRET` sama-sama diisi.
-- **Auto-logout idle** — 15 menit tanpa aktivitas, bisa diganti lewat env.
+- **Auto-logout idle** — 1 jam tanpa aktivitas, bisa diganti lewat env.
 - **Hapus akun dengan masa tunggu 7 hari** — masuk lagi adalah cara membatalkannya.
 
 ## Menjalankan
@@ -59,39 +64,42 @@ Salin `.env.example` ke `.env.local` lalu isi dari Supabase Dashboard
 
 ## Database
 
-`supabase/schema.sql` adalah sumber kebenaran untuk project baru. Terapkan lewat
-SQL Editor, atau dengan CLI:
+`supabase/schema.sql` adalah sumber kebenaran untuk project baru dan mengikuti
+bentuk yang dipakai di production: user Better Auth di `public."user"` dengan id
+berupa teks. Terapkan lewat SQL Editor, atau dengan CLI:
 
 ```bash
 supabase link --project-ref <ref>
 supabase db push        # project yang sudah punya migration
 ```
 
-Tabel: `profiles`, `budgets`, `expenses`, `salary_records` — semuanya memakai RLS
-dengan policy berbasis kepemilikan baris. Tidak ada tabel yang terbuka untuk `anon`.
+Tabel: `profiles`, `budgets`, `expenses`, `incomes` — semuanya memakai RLS. Di
+project yang sudah dideploy RLS aktif tanpa policy, jadi tabel tidak bisa dibaca
+lewat PostgREST dengan publishable key; `schema.sql` memuat policy berbasis
+kepemilikan untuk project baru. Tidak ada tabel yang terbuka untuk `anon`.
 
 Perubahan inkremental untuk project yang sudah berjalan ada di
-`supabase/migrations/`.
+`supabase/migrations/`. Migration `20261122_incomes_only.sql` mengubah baris
+`salary_records` lama menjadi baris `incomes` (deskripsi dan sumber "Gaji") lebih
+dulu, lalu menghapus tabel `salary_records` dan kolom `profiles.salary`. Migration
+ini hanya ditulis — menjalankannya ke project deployed adalah keputusan terpisah.
 
-**Penting untuk project yang sudah dideploy:** `profiles.id` menunjuk
-`public."user"(id)` (tabel Better Auth), bukan `auth.users(id)` seperti yang
-tertertulis di `schema.sql`. consequence-nya trigger `on_auth_user_created` tidak
-pernah terpanggil di sana — Better Auth tidak menulis ke `auth.users` — jadi yang
-aktif adalah trigger `on_better_user_created`.
+User Better Auth tidak pernah menulis ke `auth.users`, jadi trigger
+`on_auth_user_created` tidak aktif; yang dipakai adalah `on_better_user_created`.
 
 ### Langkah manual di Supabase Dashboard
 
 Bagian ini tidak bisa diaplikasi lewat migration, jadi harus disetel manual:
 
 1. **Redirect URLs** (Authentication → URL Configuration) — tambahkan
-   `http://localhost:3000/auth/callback`, `http://localhost:3000/reset-password`,
-   dan padanannya di production. Tanpa ini, tautan email_verify 404.
-2. **Email confirm nonaktif** (`mailer_autoconfirm: true`) — pendaftaran langsung
-   dapat sesi. Jangan dihapus cabang `setNotice` di `AuthForm.jsx` untuk kasus
-   `session === null`; itu jaring pengaman kalau setting ini dinyalakan lagi.
-3. **Leaked Password Protection** (Authentication → Policies → Password) — aktifkan
-   agar kata sandi yang pernah bocor ditolak.
-4. **`BETTER_AUTH_URL` di Vercel** harus `https://ruang-cashflow.vercel.app` untuk
+   `http://localhost:3000/api/auth/callback/google`,
+   `http://localhost:3000/reset-password`, dan padanannya di production. Rute
+   `/auth/callback` hanya stub yang mengalihkan bookmark lama ke `/login` dengan
+   pesan error; pertukaran kode sungguhan dilakukan Better Auth di
+   `/api/auth/callback/google`. Konfirmasi email dan *Leaked Password Protection*
+   adalah pengaturan Supabase Auth lama; Better Auth yang mengatur masuk dan kata
+   sandi di sini, jadi dua toggle itu tidak berpengaruh.
+2. **`BETTER_AUTH_URL` di Vercel** harus `https://ruang-cashflow.vercel.app` untuk
    Production. Nilai ini menentukan `redirect_uri` yang dikirim ke Google dan
    dicocokkan persis — kalau tertinggal di `localhost:3000`, production gagal dengan
    `redirect_uri_mismatch`.
@@ -103,17 +111,18 @@ src/
   proxy.ts             Titik masuk middleware (Next.js 16: proxy, bukan middleware)
   app/
     page.jsx           Ringkasan (dashboard)
-    transactions/      CRUD + filter
+    transactions/      CRUD + filter pengeluaran dan pemasukan
     history/           Riwayat bulanan
-    settings/          Gaji + CRUD kategori
+    settings/          CRUD kategori (pemasukan dicatat di /transactions)
       profile/         Nama, avatar, tema, kata sandi, hapus akun
       security/        Redirect ke /settings/profile
-    welcome/           Landing tamu dengan data contoh
-    login|register|reset-password/
-    auth/callback/     Tukar kode OAuth dengan sesi
+    welcome/           Landing tamu dengan data contoh (server component)
+    login|register|    Layar masuk & daftar (server component)
+    reset-password/    Pengisian token (client component)
     oauth/consent/     Layar izin OAuth
     help|about/        Statis (server component)
   api/
+    auth/[...all]/     Handler Better Auth, termasuk /api/auth/callback/google
     account/           Status akun, set kata sandi, jadwalkan/batalkan penghapusan
     avatar/            Upload & hapus avatar
     cron/purge-deletions/  Hapus permanen akun yang lewat masa tunggu
@@ -133,7 +142,8 @@ src/
     db.js              Pool Postgres
     ledger.js          Semua baca/tulis Postgres + validasi
     ledger-validation.js  Aturan validasi murni
-    money.js           Format rupiah, tanggal, ringkasan anggaran
+    money.js           Format rupiah, tanggal, ringkasan arus kas & anggaran
+    avatar.js          Satu helper URL avatar; upload/hapus lewat /api/avatar
     account.js         Panggilan level akun
     account-deletion.js  Masa tunggu 7 hari, sebagai fungsi murni
     account-purge.js   Tanda / batalkan / hapus — server-side only
@@ -224,7 +234,7 @@ bukan restart.
 ## Batasan yang diketahui
 
 - Tidak ada integrasi bank; semua angka berasal dari yang dicatat pengguna.
-- Gaji dicatat sebagai satu nilai per bulan, tanpa riwayat kenaikan.
+- Pemasukan dicatat per transaksi dengan sumber opsional berupa teks bebas.
 - Riwayat menampilkan 12 bulan terakhir.
 - Transaksi tidak dipaginasi; daftar tumbuh seiring pemakaian.
 

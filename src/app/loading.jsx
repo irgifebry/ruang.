@@ -5,5 +5,9 @@ import { LoadingState } from '@/components/ui';
  * state, so the e2e loader check can still tell them apart.
  */
 export default function Loading() {
-  return <LoadingState label="Memuat halaman..." />;
+  return (
+    <div id="konten">
+      <LoadingState label="Memuat halaman..." />
+    </div>
+  );
 }

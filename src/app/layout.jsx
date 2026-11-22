@@ -33,14 +33,14 @@ export const metadata = {
     template: '%s · ruang.',
   },
   description:
-    'Ubah gaji bulanan jadi anggaran yang bisa dipantau, lalu catat setiap pengeluaran terhadapnya.',
+    'Catat pemasukan, atur anggaran kategori, dan pantau setiap pengeluaran dalam satu tempat.',
   applicationName: 'ruang.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
     title: 'ruang. — rencana keuangan pribadi',
-    description: 'Atur gaji jadi anggaran, catat pengeluaran, dan lihat sisa uangmu setiap bulan.',
+    description: 'Catat pemasukan, atur anggaran, dan lihat sisa uangmu setiap bulan.',
     url: '/',
     siteName: 'ruang.',
     locale: 'id_ID',
@@ -57,7 +57,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'ruang. — rencana keuangan pribadi',
-    description: 'Atur gaji jadi anggaran, catat pengeluaran, dan lihat sisa uangmu setiap bulan.',
+    description: 'Catat pemasukan, atur anggaran, dan lihat sisa uangmu setiap bulan.',
     images: ['/opengraph-image'],
   },
   robots: {

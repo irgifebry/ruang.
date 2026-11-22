@@ -40,6 +40,9 @@ export async function GET(request) {
   }
 
   try {
+    // `purgeExpiredAccounts` re-checks the flag and the deadline inside each
+    // delete transaction, so a sign-in that landed after the initial select
+    // wins the race and the account survives.
     const purged = await purgeExpiredAccounts();
     return NextResponse.json({ success: true, purged: purged.length });
   } catch (error) {

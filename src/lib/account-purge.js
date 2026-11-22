@@ -56,28 +56,30 @@ export async function cancelDeletion(userId) {
 /**
  * Destroys one account: the avatar object, then every database row.
  *
- * The deletes are written out rather than left to the foreign keys. `schema.sql`
- * points `user_id` at `auth.users` while the deployed project points it at
- * Better Auth's `public."user"`, and a hand-applied profile can be either — an
- * explicit list behaves the same on all three.
+ * The deletes are written out rather than left to a cascade: every `user_id`
+ * is a text Better Auth id, but the tables do not all point at the same parent,
+ * and a hand-applied profile can still be older than the current schema. An
+ * explicit list behaves the same in both cases.
  */
 export async function purgeAccount(userId) {
-  const { rows } = await getPool().query(
+  const pool = getPool();
+  const { rows } = await pool.query(
     'SELECT id, avatar_path FROM profiles WHERE id = $1',
     [userId]
   );
   const avatars = collectAvatars(rows);
-  await destroyRows([userId]);
+  await destroyRows([userId], { requireDue: true, pool });
   await removeAvatars(avatars);
 }
 
 /**
  * Destroys every account whose grace period has run out.
  *
- * Returns the ids it removed, so the caller can log them.
+ * Returns the ids it removed, so the caller can log them. `pool` is injectable
+ * so the re-check below can be exercised without a live database.
  */
-export async function purgeExpiredAccounts() {
-  const due = await getPool().query(
+export async function purgeExpiredAccounts({ pool = getPool() } = {}) {
+  const due = await pool.query(
     `SELECT id, avatar_path FROM profiles
       WHERE deletion_requested_at IS NOT NULL
         AND deletion_requested_at <= now() - make_interval(days => $1)`,
@@ -87,15 +89,51 @@ export async function purgeExpiredAccounts() {
   const purged = [];
   for (const row of due.rows) {
     try {
-      await destroyRows([row.id]);
+      // The select above is a snapshot: a sign-in between it and this call
+      // clears the flag. `requireDue` re-checks inside the delete transaction
+      // and locks the row, so a restored account is never destroyed.
+      await destroyRows([row.id], { requireDue: true, pool });
       await removeAvatars(collectAvatars([row]));
       purged.push(row.id);
     } catch (error) {
+      if (error?.code === 'DELETION_CANCELLED') {
+        console.info(`Skipped purging account ${row.id}: the deletion was cancelled mid-sweep.`);
+        continue;
+      }
       console.error(`Failed to purge account ${row.id}:`, error);
     }
   }
 
   return purged;
+}
+
+/**
+ * Re-checks that an account is still due, inside the transaction that is about
+ * to delete it.
+ *
+ * `FOR UPDATE` holds the profile row until commit, so a concurrent sign-in
+ * cannot clear the flag between this check and the deletes. Both sides of the
+ * deadline comparison are evaluated by Postgres `now()`: the sweep's first
+ * select and this guard therefore agree even if the app server's clock drifts,
+ * and a row whose flag was cleared after the select no longer matches at all.
+ *
+ * `DELETION_CANCELLED` is a control-flow signal, not a failed sweep — callers
+ * skip the account without reporting an error.
+ */
+export async function assertStillDue(client, id) {
+  const { rowCount } = await client.query(
+    `SELECT id FROM profiles
+      WHERE id = $1
+        AND deletion_requested_at IS NOT NULL
+        AND deletion_requested_at <= now() - make_interval(days => $2)
+      FOR UPDATE`,
+    [id, DELETION_GRACE_DAYS]
+  );
+  if (rowCount !== 1) {
+    const error = new Error('Deletion was cancelled before the purge could run.');
+    error.code = 'DELETION_CANCELLED';
+    throw error;
+  }
 }
 
 /**
@@ -113,25 +151,28 @@ function collectAvatars(rows) {
 }
 
 /**
- * Every table that holds this user's data, written out rather than left to the
- * foreign keys: `schema.sql` points `user_id` at `auth.users` while the deployed
- * project points it at Better Auth's `public."user"`, and a hand-applied profile
- * can be either. An explicit list behaves the same on all three.
+ * Every table that holds this user's data, written out rather than left to a
+ * cascade: the rows are keyed by a text Better Auth id and the foreign keys do
+ * not all share one parent, so an explicit list is the only shape that behaves
+ * the same on an old and a current schema.
  *
  * One transaction for the whole batch — a partially swept table would leave the
- * next run unable to tell which accounts it already handled.
+ * next run unable to tell which accounts it already handled. `requireDue`
+ * re-checks the flag and the deadline for every id before touching a row; the
+ * forced purge from the sign-in hook passes it too, so a flag cleared mid-flight
+ * cannot turn either path into a wrongful deletion.
  */
-async function destroyRows(ids) {
+async function destroyRows(ids, { requireDue = false, pool = getPool() } = {}) {
   if (ids.length === 0) return;
 
-  const client = await getPool().connect();
+  const client = await pool.connect();
   try {
     await client.query('BEGIN');
     for (const id of ids) {
+      if (requireDue) await assertStillDue(client, id);
       await client.query('DELETE FROM expenses WHERE user_id = $1', [id]);
       await client.query('DELETE FROM incomes WHERE user_id = $1', [id]);
       await client.query('DELETE FROM budgets WHERE user_id = $1', [id]);
-      await client.query('DELETE FROM salary_records WHERE user_id = $1', [id]);
       await client.query('DELETE FROM profiles WHERE id = $1', [id]);
       await client.query('DELETE FROM "session" WHERE "userId" = $1', [id]);
       await client.query('DELETE FROM "account" WHERE "userId" = $1', [id]);
@@ -188,7 +229,15 @@ export async function reconcileOnSignIn(userId) {
   if (!requestedAt) return 'ok';
 
   if (isDeletionExpired(requestedAt)) {
-    await purgeAccount(userId);
+    try {
+      await purgeAccount(userId);
+    } catch (error) {
+      // A concurrent sign-in restored the account before the guarded delete
+      // ran. Treat it as restored rather than failing open into a session for
+      // an account whose flag is already gone.
+      if (error?.code === 'DELETION_CANCELLED') return 'restored';
+      throw error;
+    }
     return 'deleted';
   }
 

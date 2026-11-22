@@ -2,12 +2,12 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'Tentang',
-  description: 'ruang. membantu kamu mengatur gaji, anggaran, dan pengeluaran bulanan.',
+  description: 'ruang. membantu kamu mencatat pemasukan, mengatur anggaran, dan pengeluaran bulanan.',
   alternates: { canonical: '/about' },
   robots: { index: true, follow: true },
   openGraph: {
     title: 'Tentang · ruang.',
-    description: 'ruang. membantu kamu mengatur gaji, anggaran, dan pengeluaran bulanan.',
+    description: 'ruang. membantu kamu mencatat pemasukan, mengatur anggaran, dan pengeluaran bulanan.',
     url: '/about',
     type: 'article',
     images: ['/opengraph-image'],
@@ -15,7 +15,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Tentang · ruang.',
-    description: 'ruang. membantu kamu mengatur gaji, anggaran, dan pengeluaran bulanan.',
+    description: 'ruang. membantu kamu mencatat pemasukan, mengatur anggaran, dan pengeluaran bulanan.',
     images: ['/opengraph-image'],
   },
 };
@@ -27,7 +27,7 @@ const PRINCIPLES = [
   },
   {
     title: 'Data per bulan',
-    body: 'Perubahan gaji tidak mengubah riwayat bulan sebelumnya.',
+    body: 'Setiap catatan bertanggal, jadi perubahan bulan ini tidak mengubah riwayat bulan sebelumnya.',
   },
   {
     title: 'Privat',

@@ -1,8 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validAmount, validBudget, validDate, validExpense, validId, validIncome, validMonths } from '../src/lib/ledger-validation.js';
+import {
+  AMOUNT_MAX,
+  validAmount,
+  validBudget,
+  validDate,
+  validExpense,
+  validId,
+  validIncome,
+  validMonths,
+} from '../src/lib/ledger-validation.js';
 
 const uuid = '123e4567-e89b-12d3-a456-426614174000';
+
+test('AMOUNT_MAX is the single boundary for every amount', () => {
+  assert.equal(AMOUNT_MAX, 999_999_999_999);
+});
 
 test('ledger validation rejects malformed and out-of-range inputs', () => {
   assert.equal(validId(uuid), true);
@@ -19,6 +32,30 @@ test('ledger validation rejects malformed and out-of-range inputs', () => {
   assert.equal(validBudget({ name: 'Makan', monthlyLimit: 500000, color: 'red' }), false);
   assert.equal(validMonths(120), true);
   assert.equal(validMonths(121), false);
+});
+
+test('server validAmount accepts AMOUNT_MAX but rejects one rupiah past it', () => {
+  assert.equal(validAmount(999_999_999_999), true);
+  assert.equal(validAmount(1_000_000_000_000), false);
+  assert.equal(validAmount('999999999999'), true);
+  assert.equal(validAmount('1000000000000'), false);
+  // Zero is only allowed where a budget limit may be zero.
+  assert.equal(validAmount(0, true), true);
+  assert.equal(validAmount(999_999_999_999, true), true);
+  assert.equal(validAmount(1_000_000_000_000, true), false);
+});
+
+test('every server validator uses the same amount boundary', () => {
+  const expense = { categoryId: uuid, description: 'Belanja', spentOn: '2026-10-11' };
+  const income = { description: 'Bonus', receivedOn: '2026-10-11' };
+  const budget = { name: 'Makan', color: 'lime' };
+
+  assert.equal(validExpense({ ...expense, amount: 999_999_999_999 }), true);
+  assert.equal(validExpense({ ...expense, amount: 1_000_000_000_000 }), false);
+  assert.equal(validIncome({ ...income, amount: 999_999_999_999 }), true);
+  assert.equal(validIncome({ ...income, amount: 1_000_000_000_000 }), false);
+  assert.equal(validBudget({ ...budget, monthlyLimit: 999_999_999_999 }), true);
+  assert.equal(validBudget({ ...budget, monthlyLimit: 1_000_000_000_000 }), false);
 });
 
 test('validIncome mirrors validExpense without the category', () => {

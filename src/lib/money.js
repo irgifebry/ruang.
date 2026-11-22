@@ -82,7 +82,7 @@ export function ratioPercent(value, total) {
 }
 
 /**
- * How much of the salary has to be left for the balance to still read as
+ * How much of the money in has to be left for the balance to still read as
  * comfortable. A quarter, not a half: at 50% remaining the person has already
  * spent half the month on nothing measurable yet, and colouring that amber
  * would cry wolf for the rest of the month.
@@ -92,26 +92,31 @@ export const LOW_BALANCE_PERCENT = 25;
 /**
  * Severity of a month's balance, in the order the UI escalates:
  *
- *   `over`  — spending beat the salary. Red; the number is negative.
- *   `empty` — the salary is gone but nothing overspent. Amber.
- *   `low`   — under `LOW_BALANCE_PERCENT` of the salary left. Amber.
+ *   `over`  — spending beat the inflow. Red; the number is negative.
+ *   `empty` — the inflow is gone but nothing overspent. Amber.
+ *   `low`   — under `LOW_BALANCE_PERCENT` of the inflow left. Amber.
  *   `ok`    — comfortable. The accent.
  *
  * Split out of the page because four elements colour themselves from it — the
  * figure, the meter fill, the note icon and the note text — and they have to
  * agree. The caller still words each case, so the colour is never the only
  * signal; see the note branches on the dashboard.
+ *
+ * The second argument is the month's total inflow — every recorded income.
  */
-export function balanceLevel(remaining, salary) {
+export function balanceLevel(remaining, inflow) {
   const rest = toNumber(remaining);
   if (rest < 0) return 'over';
   if (rest <= 0) return 'empty';
-  if (ratioPercent(rest, salary) <= LOW_BALANCE_PERCENT) return 'low';
+  if (ratioPercent(rest, inflow) <= LOW_BALANCE_PERCENT) return 'low';
   return 'ok';
 }
 
 /**
- * The single place the app turns raw rows into the totals the UI renders.
+ * The single place the app turns raw rows into the budget figures the UI
+ * renders. There is no money-in figure here on purpose: envelopes are a user
+ * choice, not a share of the month's income, and `validateBudget` no longer
+ * caps one against the other.
  *
  * `budgets`  — `{ id, name, monthly_limit, color }`
  * `expenses` — `{ category_id, amount, spent_on }`
@@ -119,16 +124,11 @@ export function balanceLevel(remaining, salary) {
  * Each category comes back with `spent`, `remaining` (may be negative, which is
  * how the UI detects an overspend) and `percent` (clamped, for the bar).
  *
- * `remaining` here is against the salary alone, and it stays that way on
- * purpose: the per-category limits are capped by `validateBudget` against the
- * salary, so a month that also had a bonus can be over its allocation while
- * still having money left over. Mixing the two here would report a category as
- * overspent because of money that never belonged in its envelope. Use
- * `getCashflowSummary` for the "sisa uang" figure, which is about the account
- * rather than about the budget.
+ * `unspent` is the envelope total minus spend. Use `getCashflowSummary` for the
+ * account-level "sisa uang" figure, which is about all the money in rather than
+ * about the categories.
  */
-export function getBudgetSummary(salary, budgets = [], expenses = []) {
-  const safeSalary = toPositive(salary);
+export function getBudgetSummary(budgets = [], expenses = []) {
   // `Array.isArray` rather than the parameter default: a default only covers
   // `undefined`, and a page that reads these straight off an API response can
   // hand over a `null` for a key the server omitted. Everything in this module
@@ -160,11 +160,9 @@ export function getBudgetSummary(salary, budgets = [], expenses = []) {
   });
 
   return {
-    salary: safeSalary,
     spent,
-    remaining: safeSalary - spent,
     allocated,
-    unallocated: safeSalary - allocated,
+    unspent: allocated - spent,
     categories,
     overBudgetCount: categories.filter((category) => category.over).length,
   };
@@ -173,35 +171,27 @@ export function getBudgetSummary(salary, budgets = [], expenses = []) {
 /**
  * One month of money: what came in, what went out, what is left.
  *
- * `salary` is the budget base and stays that way. `incomes` is everything else
- * that arrived — a THR, a bonus — and it is added here rather
- * than anywhere else, because this is the only figure that means "money the
- * account actually has". The per-category limits in `getBudgetSummary` are
- * deliberately left measured against the salary alone: they are envelopes
- * funded out of the salary, so a bonus that arrives mid-month does not make an
- * over-budget category suddenly within budget.
- *
- * `salary`, `allocated` and `categories` are passed straight through from
- * `getBudgetSummary` so a caller that needs both reads one object. Only
- * `remaining` is redefined, because "remaining" here means inflow minus spend
- * and there it meant salary minus spend.
- *
- * `incomes` is optional and defaults to empty, so an account created before
- * this feature existed produces the same numbers it always did.
+ * `incomes` is the single money-in record — there is no separate salary. Its
+ * sum is both `income` and `inflow`; `remaining` is that inflow minus the
+ * month's spending. The per-category limits and overspend flags come straight
+ * from `getBudgetSummary` and are deliberately measured against the envelopes
+ * the user chose, not against the money that arrived.
  */
-export function getCashflowSummary(salary, incomes = [], budgets = [], expenses = []) {
-  const base = getBudgetSummary(salary, budgets, expenses);
+export function getCashflowSummary(incomes = [], budgets = [], expenses = []) {
+  const base = getBudgetSummary(budgets, expenses);
   const income = (Array.isArray(incomes) ? incomes : [])
     .reduce((sum, incomeRow) => sum + toPositive(incomeRow?.amount), 0);
-  const inflow = base.salary + income;
+  const inflow = income;
 
   return {
-    ...base,
-    salary: base.salary,
     income,
     inflow,
+    spent: base.spent,
     remaining: inflow - base.spent,
     savedPercent: ratioPercent(inflow - base.spent, inflow),
+    allocated: base.allocated,
+    categories: base.categories,
+    overBudgetCount: base.overBudgetCount,
   };
 }
 

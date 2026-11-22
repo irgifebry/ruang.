@@ -7,11 +7,13 @@
  * and the account is whole again — there is nothing to rebuild, because nothing
  * was ever removed.
  *
- * Past the window a sweep deletes the Better Auth user row, and the cascade
- * takes `profiles`, `budgets`, `expenses`, `salary_records`, `session` and
- * `account` with it. The avatar is the one thing a cascade cannot reach: Supabase
- * blocks `DELETE` on `storage.objects` from SQL precisely because it orphans the
- * file, so that removal goes through the Storage API.
+ * Past the window a sweep deletes every row belonging to the account —
+ * `expenses`, `incomes`, `budgets`, `profiles`, Better Auth's `session` and
+ * `account` rows, and finally `public."user"` — written out explicitly rather
+ * than left to a cascade, because the deployed foreign keys do not all point at
+ * the same parent. The avatar is the one thing a cascade could not reach anyway:
+ * Supabase blocks `DELETE` on `storage.objects` from SQL precisely because it
+ * orphans the file, so that removal goes through the Storage API.
  *
  * The sweep runs from `/api/cron/purge-deletions` rather than from `pg_cron`,
  * which would have been a single line in the migration but could only ever

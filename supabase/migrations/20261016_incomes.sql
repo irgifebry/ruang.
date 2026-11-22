@@ -1,5 +1,11 @@
 -- Income records: money that arrives outside the monthly salary.
 --
+-- Historical note: this describes the state when the migration was written.
+-- 20261122_incomes_only.sql later converted every salary row into an income
+-- row, dropped `salary_records` and `profiles.salary`, and made `incomes` the
+-- single money-in table for every pemasukan, salary included. Only the `--`
+-- comments in this file were updated then; its SQL is unchanged.
+--
 -- Until now the only inflow the app knew about was `salary_records`, so "sisa
 -- uang" was really "gaji minus pengeluaran". A THR, a
 -- bonus or anything else that landed in the account used to have nowhere to go, which quietly made
@@ -10,7 +16,8 @@
 -- it carries a monthly limit, a colour and a cascade from `expenses`, and none
 -- of that means anything for money coming in. So income rows carry a free-text
 -- `source` ("THR", "Bonus") that is only ever a label, and the
--- salary stays where it was — as the budget base, capped by `validateBudget`.
+-- salary stays where it was — as the budget base, capped by `validateBudget`
+-- (both the separate salary table and that cap were removed in 20261122).
 --
 -- `user_id` is `text` here and points at `public."user"`, not `uuid` /
 -- `auth.users` as `schema.sql` still says. That is not a mistake: this project's
@@ -18,8 +25,8 @@
 -- foreign key to that table would reject every row the app tries to insert.
 -- The columns on `budgets`, `expenses`, `profiles` and `salary_records` are
 -- already `text` here for the same reason; this table follows them. A fresh
--- project should apply `schema.sql` instead, which keeps the uuid/auth.users
--- shape and the ownership policies.
+-- project should apply `schema.sql`, which now mirrors this text / public."user"
+-- shape rather than the old uuid / auth.users scaffold.
 
 create table if not exists public.incomes (
   id uuid primary key default gen_random_uuid(),

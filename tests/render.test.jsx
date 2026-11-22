@@ -5,8 +5,8 @@
  * A green `next build` proves the modules parse, not that they render: a bad
  * destructuring shape or an undefined lookup still compiles. These tests render
  * the presentational pieces with realistic data, including the edge cases the
- * spec called out — empty lists, zero salary, over-budget categories, long
- * labels and large amounts.
+ * spec called out — empty lists, income with no expenses, over-budget categories,
+ * long labels and large amounts.
  *
  * Usage: node tests/render.test.jsx
  *
@@ -19,7 +19,8 @@ import assert from 'node:assert/strict';
 import { renderToStaticMarkup } from 'react-dom/server';
 import React from 'react';
 
-import { formatIDR, getBudgetSummary } from '../src/lib/money.js';
+import { formatIDR, getBudgetSummary, formatMonthLabel } from '../src/lib/money.js';
+import { buildHistoryRows } from '../src/lib/ledger.js';
 
 const {
   ExpenseList,
@@ -115,7 +116,7 @@ test('ExpenseList keeps a very large amount on one line', () => {
 });
 
 test('CategoryRow marks an over-budget category in text, not colour alone', () => {
-  const summary = getBudgetSummary(5_000_000, budgets, [{ category_id: 'food', amount: 1_400_000 }]);
+  const summary = getBudgetSummary(budgets, [{ category_id: 'food', amount: 1_400_000 }]);
   const food = summary.categories.find((category) => category.id === 'food');
 
   const html = renderToStaticMarkup(React.createElement(CategoryRow, { category: food, index: 0 }));
@@ -126,7 +127,7 @@ test('CategoryRow marks an over-budget category in text, not colour alone', () =
 });
 
 test('CategoryRow on a zero-limit category does not claim to be over budget', () => {
-  const summary = getBudgetSummary(1_000_000, [
+  const summary = getBudgetSummary([
     { id: 'misc', name: 'Lainnya', monthly_limit: 0, color: 'pink' },
   ], []);
 
@@ -138,7 +139,7 @@ test('CategoryRow on a zero-limit category does not claim to be over budget', ()
 });
 
 test('CategoryRow label survives a long category name', () => {
-  const summary = getBudgetSummary(1_000_000, [
+  const summary = getBudgetSummary([
     { id: 'x', name: 'Kategori dengan nama yang sangat panjang sekali', monthly_limit: 1000, color: 'violet' },
   ], []);
 
@@ -581,9 +582,12 @@ test('ExpenseRow on an income with a very large amount keeps it on one line', ()
 });
 
 const flowSeries = cashflowByMonth(
-  [{ received_on: '2026-09-20', amount: 1_000_000 }],
+  [
+    { id: 'i1', description: 'Pemasukan bulanan', amount: 5_000_000, received_on: '2026-09-01' },
+    { id: 'i2', description: 'THR', amount: 1_000_000, received_on: '2026-09-20' },
+    { id: 'i3', description: 'Pemasukan bulanan', amount: 5_000_000, received_on: '2026-10-01' },
+  ],
   [{ spent_on: '2026-10-05', amount: 2_000_000 }],
-  [{ key: '2026-09', amount: 5_000_000 }, { key: '2026-10', amount: 5_000_000 }],
   '2026-10',
   2,
 );
@@ -591,7 +595,7 @@ const flowSeries = cashflowByMonth(
 test('CashflowChart prices both bars and the net for every month', () => {
   const html = renderToStaticMarkup(React.createElement(CashflowChart, { series: flowSeries, months: 2 }));
 
-  // September: 5.000.000 salary + 1.000.000 THR in, nothing out → +6.000.000.
+  // September: 5.000.000 pemasukan + 1.000.000 THR in, nothing out → +6.000.000.
   assert.match(html, /Sep/);
   assert.match(html, /\+Rp\s6\.000\.000/);
   // October: 5.000.000 in, 2.000.000 out → +3.000.000.
@@ -638,11 +642,49 @@ test('CashflowChart renders the empty state rather than an all-zero chart', () =
 test('CashflowChart marks a negative month in words as well as colour', () => {
   const html = renderToStaticMarkup(
     React.createElement(CashflowChart, {
-      series: [{ key: '2026-10', label: 'Okt', salary: 1_000_000, extra: 0, inflow: 1_000_000, outflow: 4_000_000, net: -3_000_000 }],
+      series: [{ key: '2026-10', label: 'Okt', inflow: 1_000_000, outflow: 4_000_000, net: -3_000_000 }],
       months: 1,
     }),
   );
 
   assert.match(html, /−Rp\s3\.000\.000/);
   assert.match(html, /text-ruang-danger/);
+});
+
+// ---------------------------------------------------------------------------
+// History rows
+//
+// A month becomes a history row as soon as it holds a pemasukan or a pengeluaran.
+// The income-only case is the regression: the old rule required a separate
+// fixed monthly amount, so a month with nothing but an income disappeared.
+// ---------------------------------------------------------------------------
+
+test('History keeps a month with income but no expenses, with spent = 0', () => {
+  const rows = buildHistoryRows({
+    months: [{ key: '2026-09', spent: 0, count: 0, byCategory: {} }],
+    budgets: [],
+    incomesByMonth: {
+      '2026-09': [{ id: 'i1', description: 'THR', amount: 1_500_000, received_on: '2026-09-20' }],
+    },
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].key, '2026-09');
+  assert.equal(rows[0].spent, 0);
+  assert.equal(rows[0].income, 1_500_000);
+  assert.equal(rows[0].inflow, 1_500_000);
+  assert.equal(rows[0].saved, 1_500_000);
+  assert.equal(rows[0].incomeCount, 1);
+
+  // The row is something a page can actually show, not just a data shape.
+  const html = renderToStaticMarkup(
+    React.createElement(
+      Panel,
+      null,
+      React.createElement('span', null, formatMonthLabel(rows[0].key)),
+      React.createElement('strong', null, formatIDR(rows[0].inflow)),
+    ),
+  );
+  assert.match(html, /September 2026/);
+  assert.match(html, /1\.500\.000/);
 });

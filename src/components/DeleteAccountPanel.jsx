@@ -183,7 +183,7 @@ export function DeleteAccountPanel({ deletionRequestedAt = null, className = '' 
               </>
             ) : (
               <>
-                Kategori, seluruh transaksi, riwayat gaji, dan foto profil ikut terhapus. Kamu akan
+                Kategori, seluruh transaksi, riwayat pemasukan, dan foto profil ikut terhapus. Kamu akan
                 dikeluarkan dari semua perangkat, lalu datanya disimpan {DELETION_GRACE_DAYS} hari
                 lagi. Kalau masuk lagi dalam masa itu, akun dikembalikan apa adanya.
               </>

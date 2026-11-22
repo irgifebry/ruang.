@@ -1,7 +1,7 @@
 # ruang.
 
-Rencana keuangan pribadi: ubah gaji bulanan jadi anggaran yang bisa dipantau,
-lalu catat setiap pengeluaran terhadapnya.
+Rencana keuangan pribadi: catat pemasukan dan pengeluaran, susun anggaran per
+kategori, lalu pantau sisa uangnya.
 
 Next.js 16 (App Router) · React 19 · Supabase · Tailwind CSS 3
 
@@ -22,8 +22,9 @@ npm run dev
 
 ## Database
 
-`supabase/schema.sql` adalah sumber kebenaran untuk database baru. Terapkan
-dengan salin-menyalin ke SQL Editor, atau pakai CLI:
+`supabase/schema.sql` adalah sumber kebenaran untuk database baru. Skemanya
+mengikuti bentuk yang dipakai di production: user Better Auth di `public."user"`
+dengan id berupa teks. Terapkan dengan salin-menyalin ke SQL Editor, atau pakai CLI:
 
 ```bash
 supabase link --project-ref <ref>
@@ -31,42 +32,40 @@ supabase db push        # untuk project yang sudah punya migration
 ```
 
 Untuk project yang sudah berjalan, perubahan inkremental ada di
-`supabase/migrations/`.
+`supabase/migrations/`. Migration `20261122_incomes_only.sql` mengubah dulu baris
+`salary_records` lama menjadi baris `incomes` (deskripsi dan sumber "Gaji"), baru
+lalu menghapus `salary_records` dan kolom `profiles.salary`. Menjalankannya ke
+project deployed adalah keputusan terpisah — migration ini hanya disiapkan.
 
 ### Yang harus dibuat
 
-Tabel `profiles`, `budgets`, `expenses`, dan `salary_records`, masing-masing
-dengan RLS aktif dan policy berbasis kepemilikan baris. Tidak ada tabel yang
-terbuka untuk `anon`.
+Tabel `profiles`, `budgets`, `expenses`, dan `incomes`, masing-masing dengan RLS
+aktif. Di project yang sudah dideploy RLS aktif tanpa policy, jadi tabel tidak
+terjangkau lewat PostgREST dengan publishable key; `schema.sql` memuat policy
+kepemilikan baris untuk project baru. Tidak ada tabel yang terbuka untuk `anon`.
 
-### Gaji disimpan per bulan
+### Pemasukan adalah satu-satunya uang masuk
 
-`profiles.salary` awalnya menjadi satu-satunya sumber gaji, sehingga menaikkan
-gaji akan menulis ulang angka bulan-bulan sebelumnya. Sekarang gaji disimpan di
-`salary_records` dengan kunci `(user_id, month)`. `profiles.salary` tetap
-dipertahankan sebagai cerminan bulan berjalan agar kode yang membacanya tetap
-benar.
+`incomes` menyimpan tiap pemasukan sebagai baris tersendiri: `description`,
+`source` opsional berupa teks bebas (misalnya "THR" atau "Bonus"), `amount`, dan
+`tanggal diterima`. Tidak ada angka tetap bulanan; objek lama yang dipakai untuk
+itu sudah dihapus oleh migration di atas. Anggaran juga tidak punya batas yang
+dihitung dari pemasukan — `budgets` murni amplop yang limitnya dipilih pengguna.
+Pemasukan dicatat dari halaman Transaksi, bukan dari Pengaturan.
 
-Form gaji di halaman Pengaturan punya pemilih bulan, jadi gaji bulan berapa pun
-bisa diisi atau diperbaiki, bukan hanya bulan berjalan. Setiap bulan berdiri
-sendiri: menyimpan Oktober tidak mengubah September maupun bulan setelahnya.
+### Riwayat hanya berisi bulan yang ada isinya
 
-### Riwayat hanya berisi bulan yang benar diisi
-
-Sebuah bulan masuk riwayat setelah kamu menyimpan gaji untuk bulan itu. Nominal
-nol dibaca sebagai "belum diisi", jadi tidak menjadi baris riwayat — inilah
-alasan trigger tidak lagi membuat `salary_records` dengan nilai 0 untuk akun
-baru. Membrane seperti itu membuat akun kosong terlihat sudah punya riwayat.
-
-Akun lama yang sudah punya baris 0 tidak dihapus; baris itu ditimpa kalau kamu
-menyimpan nilai lain untuk bulan yang sama.
+Sebuah bulan masuk riwayat bila ada pemasukan **atau** pengeluaran di bulan itu.
+Akun baru tidak mendapat baris contoh, jadi riwayatnya kosong sampai pengguna
+mencatat sesuatu. Tidak ada nominal nol yang dipakai sebagai penanda "belum
+diisi".
 
 ### Kategori awal
 
-Trigger `on_auth_user_created` membuat profil, lima kategori siap pakai, dan
-salary record bulan ini. Sebelumnya akun baru mendapat profil kosong tanpa
-kategori, dan tidak ada cara menambahkan kategori dari antarmuka — alur Daftar
-langsung buntu di halaman Pengaturan.
+Akun baru hanya mendapat profil — tidak ada kategori template. Kategori dibuat
+sendiri dari halaman Pengaturan. Trigger lama yang menabur lima kategori dan
+baris contoh sudah dihapus; jangan menambahkannya lagi, karena itu mengisi daftar
+kosong dengan pilihan yang belum diminta pengguna.
 
 ### Hapus akun dengan masa tunggu 7 hari
 
@@ -76,9 +75,10 @@ mencabut semua sesi, dan pengguna langsung dikeluarkan. Tujuh hari kemudian
 akun itu dihapus permanen.
 
 **Masuk lagi adalah cara membatalkannya.** Hook `databaseHooks.session.create.before`
-di `src/lib/auth.js` dilewati setiap sign-in — dengan kata sandi, lewat Google,
-atau dari sesi yang diperbarui. Di sana timestempel dibersihkan, jadi tidak ada
-yang perlu dibangun ulang karena memang tidak pernah dihapus. Kalau tenggatnya
+dan `.session.update.before` di `src/lib/auth.js` dilewati setiap sign-in — dengan
+kata sandi, lewat Google, atau dari sesi yang diperbarui. Di sana timestempel
+dibersihkan, jadi tidak ada yang perlu dibangun ulang karena memang tidak pernah
+dihapus. Kalau tenggatnya
 sudah lewat, hook itu justru *menghapus* akunnya lalu mengembalikan `false`,
 sehingga sesi tidak dibuat dan login ditolak.
 
@@ -95,9 +95,8 @@ Dua hal yang perlu diketahui:
   benar-benar berjalan.
 
 Tabel yang dihapus satu per satu, bukan mengandalkan cascade:
-`expenses`, `budgets`, `salary_records`, `profiles`, lalu `public."user"`.
-`schema.sql` menunjuk `auth.users` sementara project yang dipakai menunjuk
-`public."user"`, jadi daftar eksplisit behave sama di keduanya.
+`expenses`, `budgets`, `incomes`, `profiles`, lalu `public."user"`. Berkas avatar
+ikut dihapus lewat Storage API dari route yang sama.
 
 ## Langkah manual di Supabase Dashboard
 
@@ -106,61 +105,46 @@ sendiri setelah deploy.
 
 ### 1. URL pengembalian (Redirect URLs)
 
-Tanpa ini, tautan verifikasi email dan pemulihan kata sandi berakhir di 404.
+Tambahkan URL panggilan balik Better Auth dan halaman pemulihan kata sandi:
 
 - **Authentication → URL Configuration → Redirect URLs**, tambahkan:
 
   ```
-  http://localhost:3000/auth/callback
+  http://localhost:3000/api/auth/callback/google
   http://localhost:3000/reset-password
-  https://<domain-anda>/auth/callback
+  https://<domain-anda>/api/auth/callback/google
   https://<domain-anda>/reset-password
   ```
 
-### 2. Konfirmasi email
+Rute `/auth/callback` hanya stub yang mengalihkan tautan lama ke `/login`
+dengan pesan error; kode OAuth ditukar Better Auth di
+`/api/auth/callback/google`.
 
-Project ini sekarang memakai **`Confirm email` nonaktif**
-(`mailer_autoconfirm: true`). Pendaftaran langsung mengembalikan session, jadi
-pengguna masuk ke ringkasan tanpa menunggu email.
+Konfirmasi email dan *Leaked Password Protection* adalah pengaturan Supabase
+Auth lama. Better Auth yang mengatur proses masuk dan kebijakan kata sandi di
+aplikasi ini, jadi kedua toggle itu tidak berpengaruh dan tidak perlu disetel.
 
-`src/components/AuthForm.jsx` tetap punya cabang `setNotice(...)` untuk kasus
-`data.session` bernilai `null`. Cabang itu tidak lagi terjangkau selama
-konfirmasi email mati — jangan dihapus, tapi tetap perlu dipertahankan sebagai
-jaring pengaman kalau setting ini dinyalakan lagi.
+### 2. `BETTER_AUTH_URL` di Vercel
 
-Kalau `Confirm email` diaktifkan lagi, alur verifikasi muncul: pengguna harus
-membuka email dulu sebelum bisa masuk. Dua hal yang perlu diperhatikan:
-
-- Akun yang terlanjur dibuat tanpa verifikasi **tidak** ikut terverifikasi
-  otomatis. Pengguna itu masih harus lewat tautan konfirmasi.
-- Project ini belum punya SMTP kustom, sehingga email jatuh ke mailer bawaan
-  Supabase dengan rate limit ketat. Untuk pengembangan, sebaiknya biarkan
-  konfirmasi email mati.
-
-### 3. Proteksi kata sandi bocor
-
-Advisor keamanan menandai satu hal:
-
-> Leaked Password Protection Disabled
-
-Aktifkan di **Authentication → Policies → Password** agar kata sandi yang sudah
-pernah muncul di kebocoran data ditolak. Ini di luar lingkup kode dan tidak bisa
-diubah lewat migration.
+Nilainya harus `https://ruang-cashflow.vercel.app` untuk Production. Nilai ini
+menentukan `redirect_uri` yang dikirim ke Google dan dicocokkan persis — kalau
+tertinggal di `localhost:3000`, production gagal dengan `redirect_uri_mismatch`.
 
 ## Arsitektur
 
 ```
 src/
-  app/                  Rute; setiap halaman adalah client component
+  app/                  Rute; halaman berstate adalah client component, yang
+                        mengekspor metadata adalah server component
     page.jsx            Ringkasan (dashboard)
-    transactions/       Daftar, tambah, ubah, hapus, filter
+    transactions/       Daftar, tambah, ubah, hapus, filter pengeluaran & pemasukan
     history/            Riwayat bulanan dari data nyata
-    settings/           Gaji + CRUD kategori
+    settings/           CRUD kategori (pemasukan dicatat di /transactions)
       profile/          Nama, avatar, tema, ganti kata sandi
       security/         Redirect ke /settings/profile
-    welcome/            Halaman tamu dengan data contoh
-    login|register|reset-password/
-    auth/callback/      Tukar kode OAuth/konfirmasi email dengan sesi
+    welcome/            Halaman tamu dengan data contoh (server component)
+    login|register/     Layar masuk & daftar (server component)
+    reset-password/     Pengisian token (client component)
     oauth/consent/      Layar izin OAuth; tamu diteruskan ke /login?next=
     help/               FAQ (server component)
     about/              Tentang ruang. (server component)
@@ -168,6 +152,12 @@ src/
     global-error.jsx    Error boundary root (ganti layout)
     error.jsx           Batas error per rute
     not-found.jsx       404
+  api/
+    auth/[...all]/      Handler Better Auth, termasuk /api/auth/callback/google
+    account/            Status akun, kata sandi, jadwalkan/batalkan hapus
+    avatar/             Upload & hapus avatar
+    ledger/             Semua baca/tulis ledger
+    cron/purge-deletions/  Hapus permanen lewat masa tunggu
   components/
     AppShell.jsx        Tata letak; sidebar desktop + laci mobile
     Sidebar.jsx         Navigasi, dengan status aktif per rute
@@ -181,12 +171,13 @@ src/
   hooks/
     useLedgerData.js    Siklus muat / muat-ulang / error, dengan subscription
   lib/
-    client.ts           Klien Supabase sisi browser
-    server.ts           Klien Supabase sisi server
+    client.ts           Klien Supabase di browser — hanya Storage getPublicUrl
+    server.ts           Klien Supabase sisi server peninggalan Supabase Auth; tidak dipakai
     middleware.ts       Segarkan sesi + gerbang auth, dipanggil dari proxy.ts
     proxy.ts            Titik masuk middleware (Next.js 16)
     ledger.js           Semua baca/tulis Postgres + validasi
-    money.js            Format rupiah, tanggal, ringkasan anggaran
+    money.js            Format rupiah, tanggal, ringkasan arus kas & anggaran
+    avatar.js           Satu helper URL avatar; upload/hapus lewat /api/avatar
     account.js          Panggilan level akun (status, set password, hapus akun)
     account-deletion.js Masa tunggu 7 hari, fungsinya murni
     account-purge.js    Tanda / batalkan / hapus permanen (server)
@@ -220,9 +211,10 @@ dibacakan.
 form mewajibkan digit saja. Menyimpan 12.500,50 tidak menambah apa pun pada
 anggaran pribadi dan membuat pembulatan tidak konsisten.
 
-**`?next=` dibatasi pada path relatif.** Login dan `/auth/callback` menolak
-nilai yang diawali `//` atau URL penuh, supaya parameter tidak bisa dipakai
-sebagai open redirect.
+**`?next=` dibatasi pada path relatif.** Login dan `proxy.ts` menolak nilai yang
+diawali `//` atau URL penuh, dan `AuthForm` melakukan hal yang sama pada
+`callbackURL` Google, supaya parameter tidak bisa dipakai sebagai open redirect.
+Rute `/auth/callback` tidak ikut memvalidasi — ia hanya mengalihkan ke `/login`.
 
 **Kategori yang dihapus ikut menghapus transaksinya.** Ini perilaku cascade di
 skema. Dialog konfirmasi karena itu menyebutkan jumlah transaksi yang akan ikut
@@ -269,7 +261,7 @@ node tests/e2e-pages.mjs http://localhost:3000 <email> <password>
 ## Batasan yang diketahui
 
 - Tidak ada integrasi bank; semua angka berasal dari yang dicatat pengguna.
-- Gaji dicatat sebagai satu nilai per bulan, tanpa riwayat kenaikan.
+- Pemasukan dicatat per transaksi dengan sumber opsional berupa teks bebas.
 - Riwayat menampilkan 12 bulan terakhir.
 - Transaksi tidak dipaginasi; daftar tumbuh seiring pemakaian.
 

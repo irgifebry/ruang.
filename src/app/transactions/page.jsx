@@ -159,7 +159,7 @@ function TransactionsContent({ data, reload }) {
     }
   };
 
-  const { budgets, expenses, incomes = [], salary } = data;
+  const { budgets, expenses, incomes = [] } = data;
   const isIncome = kind === 'income';
 
   /* The form's own kind. Everything below that writes or validates a row reads
@@ -215,7 +215,7 @@ function TransactionsContent({ data, reload }) {
    */
   const monthExpenses = expenses.filter((expense) => monthKey(expense.spent_on) === currentMonthKey());
   const monthIncomes = incomes.filter((income) => monthKey(income.received_on) === currentMonthKey());
-  const monthSummary = getCashflowSummary(salary, monthIncomes, budgets, monthExpenses);
+  const monthSummary = getCashflowSummary(monthIncomes, budgets, monthExpenses);
 
   /* Writes to the form for whichever kind the dialog is currently showing, so the
      toggle inside the dialog needs no special handling at the call sites. */
@@ -453,23 +453,23 @@ function TransactionsContent({ data, reload }) {
           </span>
         </div>
 
-        {/* Four figures rather than three: "Gaji" alone stopped being the whole
-            inflow the moment income could be recorded, so it is joined by " lain"
-            and the two add up to the number "Sisa" is measured against. */}
+        {/* Four figures for the month: everything that came in, what went out,
+            what is left, and the total set aside for the category envelopes.
+            "Pemasukan" is the single money-in figure — it is the whole inflow
+            that "Sisa" is measured against. */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-card">
-          <Stat label="Gaji" value={formatIDR(monthSummary.salary)} />
           <Stat
-            label="Masuk lain"
-            note="(di luar gaji)"
-            value={formatIDR(monthSummary.income)}
-            tone={monthSummary.income > 0 ? 'accent' : 'default'}
+            label="Pemasukan"
+            value={formatIDR(monthSummary.inflow)}
+            tone={monthSummary.inflow > 0 ? 'accent' : 'default'}
           />
-          <Stat label="Terpakai" value={formatIDR(monthSummary.spent)} />
+          <Stat label="Pengeluaran" value={formatIDR(monthSummary.spent)} />
           <Stat
             label="Sisa"
             value={formatIDR(monthSummary.remaining)}
             tone={monthSummary.remaining < 0 ? 'danger' : 'default'}
           />
+          <Stat label="Alokasi anggaran" value={formatIDR(monthSummary.allocated)} />
         </div>
 
         {budgets.length > 0 && (
@@ -687,7 +687,7 @@ function TransactionsContent({ data, reload }) {
 
               <small className="text-ruang-subtle text-[12px] leading-[1.6] text-center">
                   {formIsIncome
-                    ? 'Pemasukan ini menambah dana bulan yang sama, di luar gaji.'
+                    ? 'Pemasukan ini menambah dana bulan yang sama.'
                     : 'Catatan tersimpan di akunmu dan bisa diubah kapan saja.'}
               </small>
             </form>
@@ -843,7 +843,7 @@ function TransactionsContent({ data, reload }) {
                     'Tidak ada transaksi yang cocok dengan filter ini.'
                   ) : isIncome ? (
                     <span>
-                      Belum ada pemasukan di luar gaji.{' '}
+                      Belum ada pemasukan.{' '}
                       <button
                         type="button"
                         onClick={() => openForm('income')}
@@ -893,31 +893,19 @@ function TransactionsContent({ data, reload }) {
  * One figure in the month summary: a label over a number, and nothing else.
  *
  * Every stat is exactly these two lines, so the four columns keep one rhythm and
- * their numbers share a baseline. `note` is the qualifier a label needs to be
- * unambiguous — "Masuk lain (di luar gaji)" — and it rides on the label rather
- * than under the number: a third line under one figure made that column taller
- * than its three neighbours, which is the thing this layout must not do.
+ * their numbers share a baseline. Below `sm` the grid is two columns and a long
+ * label such as "Alokasi anggaran" wraps, so each label reserves two lines at
+ * that width — that keeps the wrapped column's number level with the number
+ * beside it. From `sm` up the labels fit on one line and the reservation drops.
  *
- * Below `sm` the grid is two columns, and "Masuk lain (di luar gaji)" is wider
- * than one of them, so it wraps. The label therefore reserves two lines for
- * every stat at that width, which keeps the wrapped column's number level with
- * the number beside it; from `sm` up the label fits on one line and the
- * reservation is dropped.
- *
- * `accent` marks the "Masuk lain" stat so a non-zero extra inflow reads as a
- * positive figure rather than as another neutral number.
+ * `accent` marks the "Pemasukan" stat so a non-zero inflow reads as a positive
+ * figure rather than as another neutral number.
  */
-function Stat({ label, note, value, tone = 'default' }) {
+function Stat({ label, value, tone = 'default' }) {
   return (
     <div className="min-w-0">
       <small className="block font-mono text-[11px] text-ruang-subtle tracking-[0.09em] mb-[6px] min-h-[2lh] sm:min-h-0 sm:whitespace-nowrap">
         {label}
-        {note && (
-          <>
-            {' '}
-            <span className="normal-case tracking-normal">{note}</span>
-          </>
-        )}
       </small>
       <strong
         className={`block font-mono text-[15px] font-medium truncate ${

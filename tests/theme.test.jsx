@@ -14,6 +14,7 @@ import { readFileSync } from 'node:fs';
 import {
   DEFAULT_THEME,
   FAVICON_GLYPH,
+  FAVICON_INK,
   PRE_HYDRATION_THEME_SCRIPT,
   THEMES,
   THEME_KEY,
@@ -114,14 +115,26 @@ test('the pre-paint favicon matches the one React paints', () => {
   }
 });
 
-test('the generated favicon glyph matches the static icon.svg', () => {
-  // icon.svg is the unthemed fallback and cannot be interpolated, so the glyph
-  // is duplicated. If the logo is ever redrawn, only one copy should change.
+test('the generated favicon glyph and its ink match the static icon.svg', () => {
+  // icon.svg is the unthemed (dark) fallback and cannot be interpolated, so
+  // both the glyph and its colours are duplicated. Comparing only the path let
+  // the tile or the ink drift while this test stayed green.
   const staticIcon = readFileSync(new URL('../src/app/icon.svg', import.meta.url), 'utf8');
 
   for (const isLight of [true, false]) {
     const glyph = faviconSvg(isLight).match(/<path d="([^"]+)"/)[1];
     assert.ok(staticIcon.includes(glyph), `glyph drifted for isLight=${isLight}`);
+  }
+
+  // The static file is the dark icon, so only the dark pair can be checked
+  // against it. The ink also has to agree with the constant the pre-paint
+  // script and `gen-icons.mjs` read, not just with whatever is in the SVG.
+  const darkSvg = faviconSvg(false);
+  const tileFill = darkSvg.match(/<rect[^>]*fill="(#[0-9a-f]{6})"/i)[1];
+  const inkFill = darkSvg.match(/<path d="[^"]+" fill="(#[0-9a-f]{6})"/i)[1];
+  assert.equal(inkFill, FAVICON_INK.dark, 'favicon ink drifted from the palette');
+  for (const fill of [tileFill, inkFill]) {
+    assert.ok(staticIcon.includes(`fill="${fill}"`), `static icon colour drifted: ${fill}`);
   }
 });
 

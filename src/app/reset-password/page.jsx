@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { requestPasswordReset, resetPassword } from '@/lib/auth-client';
+import { isValidResetToken } from '@/lib/reset-token';
 import { Button, FormMessage, TextField } from '@/components/form';
 import { Panel } from '@/components/ui';
 
@@ -14,6 +15,17 @@ import { Panel } from '@/components/ui';
  * `?token=` it asks for a new password and completes the update.
  */
 export default function ResetPasswordPage() {
+  // `useSearchParams` below opts the whole route out of static generation
+  // unless it sits behind a boundary. AuthForm and oauth/consent do the same;
+  // without it this page is rendered client-side just to read `?token=`.
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordInner />
+    </Suspense>
+  );
+}
+
+function ResetPasswordInner() {
   const [mode, setMode] = useState('request');
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,7 +38,11 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const token = searchParams.get('token');
 
-    if (token) {
+    // A malformed token can never be exchanged. Show the failure as a generic
+    // message instead of rendering the token or sending it to the API.
+    if (token && !isValidResetToken(token)) {
+      setError('Tautan pemulihan tidak valid atau sudah kedaluwarsa.');
+    } else if (token) {
       setMode('update');
     }
     setReady(true);
@@ -68,7 +84,7 @@ export default function ResetPasswordPage() {
     const confirm = String(form.get('confirm') ?? '');
     const token = searchParams.get('token');
 
-    if (!token) {
+    if (!isValidResetToken(token)) {
       setError('Tautan pemulihan tidak valid atau sudah kedaluwarsa.');
       setLoading(false);
       return;
@@ -105,7 +121,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-[65vh] grid place-items-center py-section">
+    <div id="konten" className="min-h-[65vh] grid place-items-center py-section">
       <div className="w-full max-w-[420px]">
         <div className="mb-section">
           <h1 className="text-[clamp(30px,5vw,46px)] tracking-[-0.06em] leading-[1.12] font-medium mb-[12px]">

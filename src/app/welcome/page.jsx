@@ -1,19 +1,19 @@
 import Link from 'next/link';
-import { initialBudgets, initialExpenses, initialSalary } from '@/lib/data';
+import { initialBudgets, initialExpenses, initialIncomes } from '@/lib/data';
 import { barClass, chipClass } from '@/lib/category-colors';
-import { formatIDR, formatMonthLabel, getBudgetSummary, ratioPercent } from '@/lib/money';
+import { formatIDR, formatMonthLabel, getCashflowSummary, ratioPercent } from '@/lib/money';
 import { ArrowRightUpIcon } from '@/components/icons';
 import BrandMark from '@/components/BrandMark';
 import { Eyebrow } from '@/components/ui';
 
 export const metadata = {
   title: 'Atur uang bulananmu',
-  description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+  description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
   alternates: { canonical: '/welcome' },
   robots: { index: true, follow: true },
   openGraph: {
     title: 'Atur uang bulananmu · ruang.',
-    description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
     url: '/welcome',
     type: 'website',
     images: ['/opengraph-image'],
@@ -21,7 +21,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Atur uang bulananmu · ruang.',
-    description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
     images: ['/opengraph-image'],
   },
 };
@@ -35,7 +35,7 @@ export const metadata = {
  */
 
 export default function WelcomePage() {
-  const summary = getBudgetSummary(initialSalary, initialBudgets, initialExpenses);
+  const summary = getCashflowSummary(initialIncomes, initialBudgets, initialExpenses);
   const recentExpenses = initialExpenses.slice(0, 5);
 
   const jsonLd = {
@@ -43,7 +43,7 @@ export default function WelcomePage() {
     '@type': 'WebApplication',
     name: 'ruang.',
     url: 'https://ruang-cashflow.vercel.app/welcome',
-    description: 'Atur gaji, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
+    description: 'Catat pemasukan, buat anggaran, catat pengeluaran, dan cek sisa uang tiap bulan.',
     applicationCategory: 'FinanceApplication',
     operatingSystem: 'Web',
     inLanguage: 'id',
@@ -69,7 +69,7 @@ export default function WelcomePage() {
       <section className="py-section grid grid-cols-1 lg:grid-cols-[1.06fr_0.94fr] gap-section items-end">
         <div>
           <h1 className="text-[clamp(38px,5.4vw,66px)] tracking-[-0.065em] leading-[1.1] font-medium mb-[18px]">
-            Atur gaji,
+            Catat pemasukan,
             <br />
             pantau <em className="font-normal italic text-ruang-accent-text">pengeluaran.</em>
           </h1>
@@ -94,7 +94,7 @@ export default function WelcomePage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-[1px] bg-ruang-line border border-ruang-line rounded-[10px] overflow-hidden">
           {[
-            ['Gaji bulanan', 'Simpan gaji tiap bulan.'],
+            ['Pemasukan bulanan', 'Catat semua uang yang masuk tiap bulan.'],
             ['Anggaran kategori', 'Tetapkan batas untuk tiap kategori.'],
             ['Riwayat transaksi', 'Lihat pengeluaran per bulan.'],
           ].map(([title, body], i) => (
@@ -220,21 +220,21 @@ function SampleCard({ summary }) {
       </div>
 
       <div className="text-[13px] leading-[1.6] text-ruang-muted">
-        dari gaji bulanan{' '}
-        <strong className="text-ruang-ink font-medium ml-[5px]">{formatIDR(summary.salary)}</strong>
+        dari pemasukan{' '}
+        <strong className="text-ruang-ink font-medium ml-[5px]">{formatIDR(summary.inflow)}</strong>
       </div>
 
       <div className="mt-[22px] h-[5px] bg-ruang-track rounded-[2px] overflow-hidden">
         <span
           className="bar-grow block h-full bg-ruang-accent"
-          style={{ width: `${ratioPercent(summary.remaining, summary.salary)}%` }}
+          style={{ width: `${ratioPercent(summary.remaining, summary.inflow)}%` }}
         />
       </div>
 
       <div className="mt-[10px] flex justify-between items-center font-mono text-[11px] tracking-[0.1em] text-ruang-muted uppercase">
         <span>SISA TERSEDIA</span>
         <span className="text-ruang-accent-text">
-          {Math.round(ratioPercent(summary.remaining, summary.salary))}%
+          {Math.round(ratioPercent(summary.remaining, summary.inflow))}%
         </span>
       </div>
     </div>

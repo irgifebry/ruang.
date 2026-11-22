@@ -16,13 +16,15 @@ export default function Error({ error, reset }) {
   }, [error]);
 
   return (
-    <ErrorState
-      message={
-        error?.message ||
-        'Terjadi kesalahan saat menampilkan halaman ini. Coba muat ulang atau kembali ke ringkasan.'
-      }
-      onRetry={reset}
-      retryLabel="Muat ulang"
-    />
+    <div id="konten">
+      <ErrorState
+        message={
+          error?.message ||
+          'Terjadi kesalahan saat menampilkan halaman ini. Coba muat ulang atau kembali ke ringkasan.'
+        }
+        onRetry={reset}
+        retryLabel="Muat ulang"
+      />
+    </div>
   );
 }

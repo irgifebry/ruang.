@@ -3,12 +3,12 @@ import { FaqItem } from '@/components/faq-item';
 
 export const metadata = {
   title: 'Bantuan',
-  description: 'Pertanyaan umum seputar ruang.: gaji, anggaran, riwayat, dan keamanan akun.',
+  description: 'Pertanyaan umum seputar ruang.: pemasukan, anggaran, riwayat, dan keamanan akun.',
   alternates: { canonical: '/help' },
   robots: { index: true, follow: true },
   openGraph: {
     title: 'Bantuan · ruang.',
-    description: 'Pertanyaan umum seputar ruang.: gaji, anggaran, riwayat, dan keamanan akun.',
+    description: 'Pertanyaan umum seputar ruang.: pemasukan, anggaran, riwayat, dan keamanan akun.',
     url: '/help',
     type: 'article',
     images: ['/opengraph-image'],
@@ -16,7 +16,7 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Bantuan · ruang.',
-    description: 'Pertanyaan umum seputar ruang.: gaji, anggaran, riwayat, dan keamanan akun.',
+    description: 'Pertanyaan umum seputar ruang.: pemasukan, anggaran, riwayat, dan keamanan akun.',
     images: ['/opengraph-image'],
   },
 };
@@ -27,7 +27,7 @@ const FAQ_GROUPS = [
     items: [
       {
         q: 'Apa yang perlu diatur dulu?',
-        a: 'Buka Pengaturan untuk menyimpan gaji bulanan dan membuat kategori beserta batas anggarannya. Setelah itu, catat pengeluaran lewat halaman Transaksi.',
+        a: 'Buka Transaksi untuk mencatat pemasukan, lalu Pengaturan untuk membuat kategori beserta batas anggarannya. Setelah itu, catat pengeluaran di halaman yang sama.',
       },
       {
         q: 'Bagaimana cara mencatat pengeluaran?',
@@ -36,19 +36,19 @@ const FAQ_GROUPS = [
     ],
   },
   {
-    title: 'Gaji dan riwayat',
+    title: 'Pemasukan dan riwayat',
     items: [
       {
         q: 'Kenapa riwayatku kosong?',
-        a: 'Riwayat menampilkan bulan yang memiliki gaji tersimpan. Gaji nol dianggap belum diisi, jadi bulan itu tidak muncul.',
+        a: 'Sebuah bulan muncul di riwayat setelah ada pemasukan atau pengeluaran yang tercatat di dalamnya. Akun baru belum punya catatan, jadi riwayatnya masih kosong.',
       },
       {
-        q: 'Bagaimana cara mengubah gaji bulan lalu?',
-        a: 'Buka Pengaturan, pilih bulan yang ingin diubah, lalu simpan gaji baru. Perubahan hanya berlaku untuk bulan tersebut.',
+        q: 'Bagaimana cara mengubah pemasukan bulan lalu?',
+        a: 'Buka Transaksi, pilih bulan yang ingin dilihat, lalu ubah atau hapus catatan pemasukannya. Perubahan hanya berlaku untuk catatan itu.',
       },
       {
-        q: 'Apakah gaji bulan ini mengubah bulan sebelumnya?',
-        a: 'Tidak. Gaji disimpan per bulan, jadi setiap perubahan tidak memengaruhi catatan bulan lain.',
+        q: 'Apakah pemasukan bulan ini mengubah bulan sebelumnya?',
+        a: 'Tidak. Setiap catatan pemasukan punya tanggal sendiri, jadi mengubah bulan ini tidak memengaruhi catatan bulan lain.',
       },
     ],
   },
@@ -86,7 +86,7 @@ export default async function HelpPage() {
       <header className="mb-section">
         <h1 className="text-[clamp(36px,4.5vw,58px)] tracking-[-0.065em] leading-[1.12] font-medium">Bantuan</h1>
         <p className="max-w-[540px] text-[14px] text-ruang-muted leading-[1.7]">
-          Panduan singkat untuk mengatur gaji, mencatat pengeluaran, dan menjaga akunmu.
+          Panduan singkat untuk mencatat pemasukan, mengatur anggaran, dan menjaga akunmu.
         </p>
       </header>
 

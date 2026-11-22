@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## Project
 
-**ruang.** — personal finance app (Indonesian UI). Next.js 16 App Router · React 19 · Supabase (auth + Postgres) · Tailwind CSS 3.
+**ruang.** — personal finance app (Indonesian UI) for recording money in (`incomes`) and money out (`expenses`). Next.js 16 App Router · React 19 · Better Auth · Supabase Postgres · Tailwind CSS 3.
 
 ## Commands
 
@@ -32,7 +32,7 @@ node tests/e2e-pages.mjs http://localhost:3000 <email> <password>
 ## Next.js 16 breaking changes
 
 - **`proxy.ts` replaces `middleware.ts`.** The file lives at `src/proxy.ts` (next to `app/`). It exports `proxy()` and a `config.matcher`. Do not create `middleware.ts` — it will be ignored.
-- Pages are **client components** by default; only static pages (`/help`, `/about`) are server components.
+- Pages are **client components** where they need state; pages that export `metadata` are **server components** — `/help`, `/about`, `/welcome`, `/login`, `/register`, `/not-found`, plus the root layout.
 
 ## Architecture
 
@@ -41,17 +41,19 @@ src/
   proxy.ts             Middleware entry (session refresh + guest redirect)
   app/
     page.jsx           Dashboard (client)
-    transactions/      CRUD + filter (client)
+    transactions/      CRUD + filter for expenses and incomes (client)
     history/           Monthly history (client)
-    settings/          Salary + category CRUD
+    settings/          Category CRUD only; income CRUD lives in /transactions
       profile/         Name, avatar, theme, password, delete account
       security/        Redirect to profile (password lives there now)
-    welcome/           Guest landing with sample data
-    login|register|reset-password/
-    auth/callback/     OAuth/email code exchange
+    welcome/           Guest landing with sample data (server)
+    login|register|    Auth screens (server; they export metadata)
+    reset-password/    Token entry (client)
     oauth/consent/     OAuth consent screen
     help|about/        Static (server)
   api/
+    auth/[...all]/     Better Auth catch-all — sign-in, sign-up, get-session,
+                       and the real Google callback at /api/auth/callback/google
     account/           Account status, set password, schedule/cancel deletion
     avatar/            Avatar upload & delete
     cron/purge-deletions/  Destroys accounts past the 7-day grace period
@@ -64,13 +66,13 @@ src/
     DeleteAccountPanel.jsx  Account deletion, a panel on /settings/profile
     idle-logout.jsx      Idle auto-logout, mounted on every route by AppShell
   lib/
-    client.ts          Browser Supabase client
-    server.ts          Server Supabase client
+    client.ts          Browser Supabase client — Storage getPublicUrl only
+    server.ts          Server Supabase client from the Supabase-Auth era; unused
     auth.js            Better Auth instance (email/password + Google, bcrypt, Resend)
     auth-client.js     Browser Better Auth client (signIn, signUp, signInSocial)
     middleware.ts      updateSession() — called by proxy.ts
     ledger.js          All Postgres reads/writes + validation
-    money.js           Rupiah format, dates, budget summary
+    money.js           Rupiah format, dates, cashflow + budget summaries
     account.js         Account-level client calls
     account-deletion.js The 7-day grace period, as pure functions
     account-purge.js   Flag / cancel / destroy — server-side only
@@ -81,7 +83,8 @@ src/
     data.js            Sample data for guest page only
     theme.jsx          ThemeProvider + useTheme (client)
     theme-presets.js   Theme data + favicon glyph + the pre-paint script (no React)
-    avatar.js          Avatar upload to the `avatars` storage bucket
+    avatar.js          Single helper for the avatar URL (`avatarUrl`);
+                       upload/delete go through /api/avatar
   hooks/
     useLedgerData.js   Load/reload/error cycle + subscription
 scripts/
@@ -93,16 +96,18 @@ scripts/
 
 - **Never write a hex colour in a component.** Every colour resolves through a
   token in `tailwind.config.cjs` (`ruang-*`), which reads a CSS variable defined
-  in `src/app/globals.css`. The only literal hexes left are the five category
-  colours, which are stored in the database as strings and looked up in
-  `category-colors.js`.
+  in `src/app/globals.css`. The remaining literal hexes live in
+  `category-colors.js`: each category colour maps to several class strings plus
+  an SVG `fill` value, and is stored in the database as a plain string.
 - Adding a colour means: a `--c-*` variable in `:root`, a `.theme-light`
   override, and a matching Tailwind entry. The codemod maps old hexes to tokens
   if one is ever missed.
 - **There are exactly three themes: `dark`, `light`, `system`.** Nothing writes a
   CSS variable at runtime — the whole palette is `:root` plus a `.theme-light`
-  override, so `applyTheme` only toggles that one class (and the favicon). Do not
-  reintroduce a per-user colour choice without an equivalent reason.
+  override. `applyTheme` toggles both `theme-light` and `dark` on `<html>`, then
+  repaints the favicon and the `theme-color` meta so browser chrome and the tab
+  follow the same theme. Do not reintroduce a per-user colour choice without an
+  equivalent reason.
 - **The theme lives in Postgres (`profiles.theme`) and is cached in
   localStorage.** The cache exists only so the page paints correctly before React
   hydrates; `PRE_HYDRATION_THEME_SCRIPT` in `theme-presets.js` is inlined in
@@ -177,12 +182,28 @@ scripts/
 
 ## Database
 
-- **`supabase/schema.sql`** is the source of truth for new projects. **`supabase/migrations/`** has incremental changes for existing projects.
-- Tables: `profiles`, `budgets`, `expenses`, `salary_records` — all with RLS, ownership-based policies. No table is open to `anon`.
-- **Salary is per-month** in `salary_records` (keyed by `(user_id, month)`). `profiles.salary` mirrors the current month only.
+- **`supabase/schema.sql`** is the source of truth for new projects and now
+  mirrors the deployed shape — Better Auth's `public."user"` with text ids, not
+  the old uuid/`auth.users` scaffold. **`supabase/migrations/`** has incremental
+  changes for existing projects. `20261122_incomes_only.sql` converts each old
+  `salary_records` row into an `incomes` row (description and source "Gaji"),
+  then drops `salary_records` and `profiles.salary`. It is written, not run
+  automatically — executing it is a separate decision.
+- Tables: `profiles`, `budgets`, `expenses`, `incomes` — all with RLS. On both
+  a fresh install and the deployed project RLS is on with **no policies**, so
+  neither `anon` nor `authenticated` can reach a row over PostgREST with the
+  publishable key. Do not add an `auth.uid()` policy: that function returns a
+  uuid while `user_id` is a text Better Auth id, so such a policy would match
+  nothing instead of protecting anything. All access goes through `/api/*`
+  with a privileged database client, which scopes every query by `userId`.
+- **`incomes` is the single money-in record**: `description`, an optional
+  free-text `source`, `amount`, `received_on`, `created_at`. Money in is never
+  modelled as a fixed monthly figure, and `budgets` are plain category envelopes
+  — the user chooses their limits, with no cap derived from income.
 - **`profiles` carries identity and appearance**: `name`, `avatar_path`, `theme`.
   `avatar_path` is a storage object path, not a URL — derive the URL with
-  `avatar.js`. `accent` was dropped in `20261013`.
+  `avatarUrl()` in `avatar.js`, the one helper both the sidebar and the profile
+  screen use. `accent` was dropped in `20261013`.
 - **Trigger `on_auth_user_created`** creates the profile (with the display name
   from `raw_user_meta_data.full_name`) and nothing else.
 - **Trigger `on_better_user_created`** (on Better Auth's `"user"` table) does the
@@ -196,18 +217,18 @@ scripts/
   `/settings` and on the dashboard, and names its own categories. Both trigger
   functions use `on conflict (id) do nothing` for the same reason — a duplicate
   profile must not abort the signup.
-- **On the deployed project `profiles.id` references `public."user"(id)`,** not
-  `auth.users(id)` as `schema.sql` still says. `on_auth_user_created` therefore
-  cannot fire there — Better Auth never writes `auth.users` — so it is legacy on
-  that project and the Better Auth trigger is the live one.
+- **Every `user_id`, including `profiles.id`, is `text` and references
+  `public."user"(id)`** in both `schema.sql` and the deployed project. Better Auth
+  never writes `auth.users`, so `on_auth_user_created` cannot fire and is legacy;
+  `on_better_user_created` is the live trigger. Never use `auth.uid()` or
+  `auth.users` in a new migration.
 - **Avatars** live in a public `avatars` storage bucket. Writes are keyed to the
   folder name (`<user_id>/…`), so a user cannot post to somebody else's path.
 - **`profiles.deletion_requested_at` is a pending flag, not a tombstone.**
   "Hapus akun" only stamps it and revokes every session; signing in again inside
   the grace period clears it. The purge reads it, then deletes `expenses`,
-  `budgets`, `salary_records`, `profiles` and `public."user"` — written out one
-  by one rather than left to the cascade, because `schema.sql` points `user_id`
-  at `auth.users` while the deployed project points it at `public."user"`.
+  `budgets`, `incomes`, `profiles` and `public."user"` explicitly rather than
+  relying on the cascade, and removes the avatar through the Storage API.
   **The sweep runs from `/api/cron/purge-deletions`, not from SQL**, because
   Supabase blocks `DELETE` on `storage.objects` precisely to stop files being
   orphaned — a SQL purge would strand every deleted user's avatar in a public
@@ -215,13 +236,22 @@ scripts/
   `CRON_SECRET`; unset, the route refuses every call and nothing is ever
   actually destroyed.
 - **Category deletion cascades to transactions** (schema-level `ON DELETE CASCADE`).
-- Zero salary = "not set" — no history row created.
+- **A month appears in history only if it has an income or an expense.** New
+  accounts get no placeholder rows, so an empty account has an empty history.
 
 ## Manual Supabase Dashboard setup (not in migrations)
 
-1. **Redirect URLs** — add `http://localhost:3000/auth/callback`, `http://localhost:3000/reset-password`, and production equivalents. Without these, email verification and password reset 404.
-2. **Email confirm is disabled** (`mailer_autoconfirm: true`). Signup returns a session immediately. Do not remove the `setNotice` branch in `AuthForm.jsx` for `null` session — it's a safety net.
-3. **Leaked Password Protection** — enable under Authentication → Policies → Password.
+1. **Redirect URLs** — add `http://localhost:3000/api/auth/callback/google`,
+   `http://localhost:3000/reset-password`, and production equivalents. There is
+   `/auth/callback` is only a legacy stub that redirects stale bookmarks to
+   `/login?error=autentikasi-tidak-didukung`; it performs no code exchange.
+   The real exchange is Better Auth's `/api/auth/callback/google`. Google
+   matches the registered redirect URI exactly, so both environments' URIs
+   live on the same OAuth client.
+
+Email confirmation and "Leaked Password Protection" are Supabase-Auth settings;
+Better Auth owns sign-in and password policy here, so those toggles do not affect
+the app.
 
 ## Environment
 
@@ -251,19 +281,20 @@ Rotating a Google client secret: Cloud Console → Credentials → edit → rese
 ## Implementation gotchas
 
 - **`bg-${color}` never works.** Tailwind can't see dynamic class names. Category colors are plain strings (`'lime'`) in Postgres — always map through `category-colors.js`.
-- **`profiles` writes go through `updateProfile()` in `ledger.js`.** The settings page used to call `supabase.from('profiles')` directly and discarded the returned error, so a failed save reported success. `salary` is deliberately not in its writable set — `saveSalary()` owns that column.
+- **`profiles` writes go through `updateProfile()` in `ledger.js`.** The settings page used to call `supabase.from('profiles')` directly and discarded the returned error, so a failed save reported success. The same call also syncs `public."user".name` and the provider image in one transaction, so a partial failure cannot leave the two out of step.
 - **Dates are local-time.** `new Date('2026-10-07')` parses as UTC midnight, which is the previous day west of Greenwich. Every date goes through `toDate()` and formats from local components.
 - **Money inputs use `type="text"`.** Number inputs silently discard invalid input (e.g. pasted "12.500"), giving no feedback. Text lets validation catch it.
 - **Integer amounts only.** Postgres `numeric` columns accept decimals, but forms enforce digits-only. No decimals in personal budgeting. `validateExpense` therefore rejects a real decimal like `12.75` rather than rounding it into `1275`.
 - **The Better Auth client takes no `baseURL`.** `getBaseURL` returns the configured value verbatim and never compares it to the current origin, so pinning it to `NEXT_PUBLIC_BETTER_AUTH_URL` makes every call absolute. That still answers 200 on localhost, which hides the bug, but `context.data.url` does not survive a cross-origin response, so the redirect plugin never fires and the Google button hangs on its busy label forever. Omitting `baseURL` falls back to `window.location.origin` — same-origin everywhere, and nothing to set per deploy. `NEXT_PUBLIC_BETTER_AUTH_URL` is now only read by the server instance.
 - **Every `authClient` call resolves to `{ data, error }`.** Better-fetch is created without `throw: true`, so a 4xx/5xx does not reject — it comes back as `error` and the payload sits under `data`. Destructuring `url` off the top level of `signIn.social(...)` always yields `undefined`, which threw `no authorization url` and reported every click as "Tidak bisa terhubung ke Google" while the server had in fact answered with a Google URL.
 - **`handleGoogle` navigates explicitly.** It reads `data.url` off the `signInSocial` result and assigns `window.location.href` rather than trusting better-auth's built-in redirect, and treats a missing URL as a failure so the button can never stick on "Menghubungkan ke Google...". The catch logs the real cause to the console while the visitor keeps the friendly copy — never surface Better Auth's own error code in the UI.
-- **`?next=` is relative-only.** Login and `/auth/callback` reject `//` or absolute URLs to prevent open redirects. `AuthForm` applies the same check to the Google `callbackURL`, so adding a social provider must not bypass it.
+- **`?next=` is relative-only.** Login and `proxy.ts` reject `//` or absolute URLs to prevent open redirects; `AuthForm` applies the same check to the Google `callbackURL`, so adding a social provider must not bypass it. The `/auth/callback` stub validates nothing — it only redirects to `/login` with a fixed error code; never route a real OAuth exchange through it.
 - **Google account linking is on, scoped to Google.** Someone who registered with a password and later signs in with the same address gets the existing account rather than a duplicate-email rejection. `allowDifferentEmails` stays `false` and `trustedProviders` is `['google']` — widening either is an account-takeover surface, not a feature.
-- **The brand glyph lives in one constant, `FAVICON_GLYPH` in `theme-presets.js`.** It reaches the tab through `faviconSvg()` and the pre-paint script, the sidebar and welcome chips through `components/BrandMark.jsx`, and `apple-icon.png` through `scripts/gen-icons.mjs`. Redrawing the logo means editing that constant, updating `src/app/icon.svg` to match, then running `node scripts/gen-icons.mjs` — the script refuses to run if the two disagree. It is a solid silhouette with no inner counter on purpose: at 16px a counter closes into a blob.
+- **The brand glyph lives in one constant, `FAVICON_GLYPH` in `theme-presets.js`.** It reaches the tab through `faviconSvg()` and the pre-paint script, the sidebar and welcome chips through `components/BrandMark.jsx`, and `apple-icon.png` through `scripts/gen-icons.mjs`. Redrawing the logo means editing that constant, updating `src/app/icon.svg` to match, then running `node scripts/gen-icons.mjs` — the script refuses to run if the two disagree. The static `icon.svg` must also match the ink it is drawn in: `FAVICON_INK` pairs with `FAVICON_FILL` to mirror `--c-accent-ink` / `--c-accent`, and the theme test asserts they agree. It is a solid silhouette with no inner counter on purpose: at 16px a counter closes into a blob.
 - **Signing in is the restore gesture for a pending account deletion.**
-  `databaseHooks.session.create.before` in `auth.js` runs on every sign-in —
-  password, Google, or a refreshed session — and calls `reconcileOnSignIn`,
+  `databaseHooks.session.create.before` and `.session.update.before` in `auth.js`
+  run on every sign-in — password, Google, or a refreshed session — and call
+  `reconcileOnSignIn`,
   which clears `deletion_requested_at` or, past the deadline, destroys the
   account and returns `false` so no session is created. Do not add a "cancel"
   button elsewhere: the sessions are revoked on request, so there is no page

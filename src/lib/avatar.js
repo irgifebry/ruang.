@@ -1,14 +1,15 @@
 /**
- * @deprecated Legacy client-side avatar helpers.
+ * Avatar helpers.
  *
- * Not currently imported by application code. Avatar upload and deletion are
- * handled by the server-side route `/api/avatar` (POST and DELETE), which enforces
- * authentication, file size bounds, MIME and magic-byte validation, and database synchronization.
- *
- * Kept for reference or backward compatibility.
+ * Uploads and deletions go through the server route `/api/avatar` (POST and
+ * DELETE), which owns authentication, size/MIME/magic-byte validation and the
+ * database write. This module owns the one thing the browser still needs:
+ * turning a stored `profiles.avatar_path` into a public URL. Both the sidebar
+ * and the profile screen call `avatarUrl`, so the bucket path is written once.
  */
 
 const BUCKET = 'avatars';
+const PUBLIC_PATH = '/storage/v1/object/public/avatars/';
 const MAX_BYTES = 2 * 1024 * 1024;
 
 const EXTENSIONS = {
@@ -90,8 +91,18 @@ export async function deleteAvatar(supabase, path) {
   }
 }
 
-/** The public URL for a stored path, or null when there is no avatar. */
-export function avatarUrl(supabase, path) {
+/**
+ * The public URL for a stored avatar path, or null when there is no path.
+ *
+ * The URL shape lives here rather than in two components: the sidebar used to
+ * concatenate the string and the profile screen called `getPublicUrl`, so a
+ * bucket or URL change only ever reached one of them. `version` is the optional
+ * cache-buster those callers append after an upload or a re-read — the object
+ * keeps its path, so a bare `src` would keep showing the previous image.
+ */
+export function avatarUrl(path, version = 0) {
   if (!path) return null;
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const url = `${base}${PUBLIC_PATH}${encodeURI(path)}`;
+  return version ? `${url}?v=${version}` : url;
 }

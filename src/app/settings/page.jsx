@@ -1,40 +1,26 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useLedgerData, useMutation } from '@/hooks/useLedgerData';
-import { createClient } from '@/lib/client';
 import {
   BUDGET_COLORS,
   countExpensesIn,
   createBudget,
   deleteBudget,
   fetchLedger,
-  saveSalary,
   updateBudget,
   validateBudget,
-  validateSalary,
 } from '@/lib/ledger';
 import { swatchClass, chipClass } from '@/lib/category-colors';
-import {
-  currentMonthKey,
-  formatIDR,
-  formatMonthLabel,
-  monthRange,
-  shiftMonth,
-  monthStart,
-} from '@/lib/money';
+import { formatIDR } from '@/lib/money';
 import { Button, FormMessage, GhostButton, NumberField, TextField } from '@/components/form';
 import { useConfirm } from '@/components/confirm-dialog';
-import { ArrowLeftIcon, ArrowRightIcon, ArrowRightUpIcon } from '@/components/icons';
+import { ArrowRightUpIcon } from '@/components/icons';
 import { EmptyState, ErrorState, Eyebrow, LoadingState, Panel } from '@/components/ui';
 
 
 const BLANK_BUDGET = { name: '', monthlyLimit: '', color: 'lime' };
-
-/** How far back and forward the month stepper travels from the current month. */
-const MONTHS_BACK = 24;
-const MONTHS_FORWARD = 12;
 
 export default function SettingsPage() {
   const { data, loading, error, reload } = useLedgerData(fetchLedger);
@@ -47,13 +33,6 @@ export default function SettingsPage() {
 }
 
 function SettingsContent({ data, reload }) {
-  // Which month's salary the form is editing. Defaults to the current month so
-  // the common case is unchanged, but every other month is reachable.
-  const [salaryMonth, setSalaryMonth] = useState(() => currentMonthKey());
-  const [salaryInput, setSalaryInput] = useState(() => String(data.salary ?? 0));
-  const [salaryError, setSalaryError] = useState(null);
-  const [salarySavedMonth, setSalarySavedMonth] = useState('');
-
   const [draft, setDraft] = useState(BLANK_BUDGET);
   const [draftErrors, setDraftErrors] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -62,83 +41,8 @@ function SettingsContent({ data, reload }) {
 
   const [run, busy, mutationError, setMutationError] = useMutation();
   const { confirm, dialog } = useConfirm();
-  const supabase = useMemo(() => createClient(), []);
 
-  const { budgets, expenses, salaryRecords } = data;
-  const totalAllocated = budgets.reduce((sum, budget) => sum + Number(budget.monthly_limit ?? 0), 0);
-
-  /** Saved amount per 'YYYY-MM', so month lookups do not scan the array. */
-  const salaryByMonth = useMemo(
-    () => new Map((salaryRecords ?? []).map((record) => [record.key, record.amount])),
-    [salaryRecords],
-  );
-
-  /** What the form is editing: the stored amount, or 0 for a month never set. */
-  const selectedSalary = salaryByMonth.get(salaryMonth) ?? 0;
-  const hasSelectedRecord = salaryByMonth.has(salaryMonth);
-
-  // --- Salary ------------------------------------------------------------
-
-  /**
-   * Months offered by the picker: a fixed window around today, plus any month
-   * that already has a record. Without the second part a salary saved years ago
-   * would be invisible and therefore impossible to correct.
-   */
-  const monthOptions = useMemo(() => {
-    const keys = new Set(monthRange(currentMonthKey(), MONTHS_BACK, MONTHS_FORWARD));
-    for (const record of salaryRecords ?? []) keys.add(record.key);
-    return [...keys].sort((a, b) => b.localeCompare(a));
-  }, [salaryRecords]);
-
-  const selectMonth = (key) => {
-    setSalaryMonth(key);
-    setSalaryInput(String(salaryByMonth.get(key) ?? 0));
-    setSalaryError(null);
-    setSalarySavedMonth('');
-    setSuccess('');
-    setMutationError(null);
-  };
-
-  const stepMonth = (delta) => {
-    const target = shiftMonth(salaryMonth, delta);
-    if (monthOptions.includes(target)) selectMonth(target);
-  };
-
-  const handleSalarySave = async () => {
-    const message = validateSalary(salaryInput);
-    setSalaryError(message);
-    setSalarySavedMonth('');
-    if (message) return;
-
-    // Additional check: salary month must not be before account creation month
-    if (data.profile?.created_at) {
-      const accountCreationDate = monthStart(new Date(data.profile.created_at));
-      const salaryMonthDate = monthStart(new Date(`${salaryMonth}-01`));
-      if (salaryMonthDate < accountCreationDate) {
-        const accountMonthLabel = formatMonthLabel(accountCreationDate);
-        setSalaryError(`Bulan gaji harus berada pada bulan pembuatan akun (${accountMonthLabel}) atau setelahnya.`);
-        return;
-      }
-    }
-
-    // The month is part of the key, so this writes one row and leaves every
-    // other month exactly as it was.
-    const ok = await run(async () => {
-      await saveSalary(`${salaryMonth}-01`, salaryInput);
-    });
-
-    if (ok) {
-      // A zero saves without ever becoming a history entry, so say so rather
-      // than claiming the month was recorded.
-      setSalarySavedMonth(salaryMonth);
-      setSuccess(
-        Number(salaryInput) === 0
-          ? `${formatMonthLabel(salaryMonth)} tetap kosong dan belum masuk riwayat.`
-          : `Gaji ${formatMonthLabel(salaryMonth)} tersimpan.`,
-      );
-      reload();
-    }
-  };
+  const { budgets, expenses } = data;
 
   // --- Category create / update -----------------------------------------
 
@@ -153,9 +57,7 @@ function SettingsContent({ data, reload }) {
   const handleBudgetSubmit = async (event) => {
     event.preventDefault();
 
-    // Get the salary for the currently selected month in the salary picker
-    const currentSalary = salaryByMonth.get(salaryMonth) ?? data.salary ?? 0;
-    const errors = validateBudget(draft, { budgets, ignoreId: editingId, salary: currentSalary });
+    const errors = validateBudget(draft, { budgets, ignoreId: editingId });
     setDraftErrors(errors);
     setSuccess('');
     setMutationError(null);
@@ -168,9 +70,9 @@ function SettingsContent({ data, reload }) {
 
     const ok = await run(async () => {
       if (editingId) {
-        await updateBudget(supabase, editingId, draft);
+        await updateBudget(editingId, draft);
       } else {
-        await createBudget(supabase, draft);
+        await createBudget(draft);
       }
     });
 
@@ -209,7 +111,7 @@ function SettingsContent({ data, reload }) {
       onConfirm: async () => {
         if (editingId === budget.id) cancelEdit();
 
-        const ok = await run(() => deleteBudget(supabase, budget.id));
+        const ok = await run(() => deleteBudget(budget.id));
         if (!ok) return false;
 
         setSuccess('Kategori dihapus.');
@@ -228,170 +130,29 @@ function SettingsContent({ data, reload }) {
       </header>
 
       <section className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.15fr] gap-card items-start">
-        {/* Salary -------------------------------------------------------- */}
+        {/* Pemasukan ---------------------------------------------------- */}
+        {/* Money in has one home: /transactions, where an income row is just a
+            description, an optional source, an amount and a date. This panel is
+            the way in from here, not a second editor with its own rules. */}
         <Panel>
-          <Eyebrow className="mb-card">Gaji</Eyebrow>
-          <h2 className="text-[19px] tracking-[-0.04em] font-medium mb-card">Gaji per bulan</h2>
-
-          {/* Month picker. The salary form edits one month at a time, so the
-              figure on screen always belongs to the month named here rather
-              than to whatever "now" happens to be. */}
-          <div className="flex items-center gap-card mb-card">
-            <button
-              type="button"
-              onClick={() => stepMonth(-1)}
-              disabled={!monthOptions.includes(shiftMonth(salaryMonth, -1))}
-              aria-label="Bulan sebelumnya"
-              className="w-[44px] h-[44px] flex-none grid place-items-center border border-ruang-line-2 rounded-[3px] text-ruang-subtle hover:text-ruang-accent-text hover:border-ruang-accent-text transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-            >
-              <ArrowLeftIcon size={13} aria-hidden="true" />
-            </button>
-
-            <div className="relative flex-1 min-w-0">
-              <label htmlFor="salary-month" className="sr-only">
-                Pilih bulan gaji
-              </label>
-              <select
-                id="salary-month"
-                value={salaryMonth}
-                onChange={(e) => selectMonth(e.target.value)}
-                className="w-full h-[44px] bg-ruang-shell border border-ruang-line-2 rounded-[3px] text-ruang-ink px-[10px] text-[13px] outline-none focus:border-ruang-accent-text cursor-pointer"
-              >
-                {monthOptions.map((key) => (
-                  <option key={key} value={key} className="bg-ruang-shell">
-                    {formatMonthLabel(key)}
-                    {key === currentMonthKey() ? ' — bulan ini' : ''}
-                    {salaryByMonth.has(key) ? '' : ' — belum diisi'}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => stepMonth(1)}
-              disabled={!monthOptions.includes(shiftMonth(salaryMonth, 1))}
-              aria-label="Bulan berikutnya"
-              className="w-[44px] h-[44px] flex-none grid place-items-center border border-ruang-line-2 rounded-[3px] text-ruang-subtle hover:text-ruang-accent-text hover:border-ruang-accent-text transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-            >
-              <ArrowRightIcon size={13} aria-hidden="true" />
-            </button>
-          </div>
-
-          <NumberField
-            id="salary"
-            label={`Gaji ${formatMonthLabel(salaryMonth)}`}
-            value={salaryInput}
-            onChange={(e) => {
-              setSalaryInput(e.target.value.replace(/[^\d]/g, ''));
-              setSalaryError(null);
-              setSalarySavedMonth('');
-            }}
-            error={salaryError}
-            size="lg"
-            autoComplete="off"
-            hint="Gaji bersih bulan itu. Menyimpan hanya mengubah bulan yang dipilih. Nominal nol berarti bulan itu belum diisi, jadi tidak masuk riwayat."
-          />
-
-          <div className="mt-card flex items-center gap-[10px]">
-            <Button onClick={handleSalarySave} busy={busy} busyLabel="Menyimpan...">
-              Simpan gaji <ArrowRightUpIcon size={15} aria-hidden="true" />
-            </Button>
-            {hasSelectedRecord && (
-              <span className="font-mono text-[11px] tracking-[0.06em] text-ruang-subtle">
-                Tersimpan {formatIDR(selectedSalary)}
-              </span>
-            )}
-          </div>
-
-          {salarySavedMonth && (
-            <p className="text-ruang-accent-text text-[12px] mt-[10px]" role="status">
-              {Number(salaryInput) === 0
-                ? `${formatMonthLabel(salarySavedMonth)} tetap kosong dan belum masuk riwayat.`
-                : `Gaji ${formatMonthLabel(salarySavedMonth)} tersimpan.`}
-            </p>
-          )}
-
-          <div className="mt-[20px] pt-card border-t border-ruang-line">
-            <div className="flex items-center justify-between gap-[10px]">
-              <span className="font-mono text-[11px] tracking-[0.08em] text-ruang-subtle uppercase">
-                Anggaran dan gaji {formatMonthLabel(salaryMonth).toUpperCase()}
-              </span>
-              <strong
-                className={`font-mono text-[13px] ${
-                  totalAllocated > selectedSalary ? 'text-ruang-danger' : 'text-ruang-ink'
-                }`}
-              >
-                {formatIDR(totalAllocated)}
-              </strong>
-            </div>
-            <div className="flex items-center justify-between gap-[10px] mt-[8px]">
-              <span className="text-[12px] text-ruang-subtle">
-                {totalAllocated > selectedSalary ? 'Melebihi gaji bulan ini' : 'Sisa belum dialokasikan'}
-              </span>
-              <strong className="font-mono text-[13px] text-ruang-accent-text">
-                {formatIDR(Math.abs(selectedSalary - totalAllocated))}
-              </strong>
-            </div>
-          </div>
-
-          {/* History. Read-only on purpose: it exists so a raise is visible, and
-              clicking a row jumps the picker to that month rather than editing
-              in place, so there is only ever one editing surface.
-
-              One row per month the user actually saved. Months that were never
-              filled in have no row here and no entry on /history, so nothing
-              appears that nobody entered. */}
-          <div className="mt-[20px] pt-card border-t border-ruang-line">
-            <div className="flex items-center justify-between gap-[10px] mb-[10px]">
-              <span className="font-mono text-[11px] tracking-[0.08em] text-ruang-subtle uppercase">Riwayat gaji</span>
-              <span className="font-mono text-[11px] text-ruang-subtle">
-                {(salaryRecords ?? []).length} bulan
-              </span>
-            </div>
-
-            {(salaryRecords ?? []).length ? (
-              <ul className="border-t border-ruang-line">
-                {(salaryRecords ?? []).map((record) => (
-                  <li key={record.month}>
-                    <button
-                      type="button"
-                      onClick={() => selectMonth(record.key)}
-                      aria-current={record.key === salaryMonth ? 'true' : undefined}
-                      className={`w-full flex items-center gap-[10px] border-b border-ruang-line py-[11px] px-[8px] rounded-[3px] text-left transition-colors ${
-                        record.key === salaryMonth ? 'bg-ruang-hover' : 'hover:bg-ruang-hover'
-                      }`}
-                    >
-                      <span
-                        className={`flex-1 min-w-0 text-[13px] font-medium truncate ${
-                          record.key === salaryMonth ? 'text-ruang-accent-text' : 'text-ruang-ink'
-                        }`}
-                        title={formatMonthLabel(record.key)}
-                      >
-                        {formatMonthLabel(record.key)}
-                      </span>
-                      {record.key === currentMonthKey() && (
-                        <span className="font-mono text-[11px] text-ruang-subtle flex-none">Bulan ini</span>
-                      )}
-                      <span className="font-mono text-[12px] text-ruang-body whitespace-nowrap flex-none">
-                        {formatIDR(record.amount)}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState className="!p-[14px]">
-                Belum ada gaji tersimpan. Isi nominal di atas, lalu bulan itu baru muncul di riwayat.
-              </EmptyState>
-            )}
-          </div>
+          <Eyebrow className="mb-card">Pemasukan</Eyebrow>
+          <h2 className="text-[19px] tracking-[-0.04em] font-medium mb-card">Catat uang masuk</h2>
+          <p className="text-[13px] leading-[1.65] text-ruang-muted mb-card">
+            Semua pemasukan dicatat lewat halaman Transaksi, bersama pengeluaran. Di sini kamu hanya
+            mengatur kategori dan batas anggaran untuk uang yang keluar.
+          </p>
+          <Link
+            href="/transactions"
+            className="h-[42px] px-[18px] inline-flex items-center gap-[10px] text-[13px] font-bold tracking-[0.02em] rounded-[4px] bg-ruang-accent text-ruang-accent-ink hover:bg-ruang-accent-hover transition-colors active:scale-95 no-underline"
+          >
+            Buka transaksi <ArrowRightUpIcon size={15} aria-hidden="true" />
+          </Link>
         </Panel>
 
         {/* Categories ---------------------------------------------------- */}
-        {/* `scroll-mt-[70px]` clears the fixed mobile bar when this panel is
+        {/* The scroll token clears the fixed mobile bar when this panel is
             targeted by an anchor link from the transactions page. */}
-        <Panel id="form-kategori" className="scroll-mt-[70px]">
+        <Panel id="form-kategori" className="scroll-mt-mobile-bar-scroll">
           <div className="flex items-center justify-between gap-[10px] mb-[17px]">
             <div>
               <Eyebrow>Anggaranmu</Eyebrow>
@@ -402,9 +163,8 @@ function SettingsContent({ data, reload }) {
             </span>
           </div>
 
-          {/* Create / edit form. Without this the app is a dead end for a new
-              account: the trigger seeds five categories, but deleting one left
-              no way to bring a replacement back. */}
+          {/* Create / edit form. A new account starts with no categories at all,
+              so without this there would be no way to record an expense. */}
           <form
             onSubmit={handleBudgetSubmit}
             className="border border-ruang-line p-[18px] mb-[20px] bg-ruang-sunken"

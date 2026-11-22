@@ -31,13 +31,15 @@ export default function AppShell({ children }) {
     <div className="min-h-screen bg-ruang-bg text-ruang-ink">
       <IdleLogout />
       <SidebarWithSession />
-      {/* `pt-[56px]` clears the fixed mobile bar; `lg:pt-0` hands the space
-          back to the desktop sidebar, which is fixed at full height.
+      {/* `pt-mobile-bar` clears the fixed mobile bar; `lg:pt-0` hands the space
+          back to the desktop sidebar, which is fixed at full height. It reads
+          the same `--mobile-bar-h` the bar draws itself with, so the two cannot
+          drift apart.
           `lg:ml-sidebar` is the same `--sidebar-w` the rail draws itself with,
           so the gutter follows a collapse instead of snapping after it. The page
           padding uses standard tokens so content is not squeezed
           against the edge. */}
-      <main className="pt-[56px] lg:pt-0 lg:ml-sidebar min-h-screen max-w-[1800px] px-6 sm:px-8 lg:px-12 relative transition-[margin-left] duration-[var(--sidebar-dur)] ease-[var(--sidebar-ease)]">
+      <main className="pt-mobile-bar lg:pt-0 lg:ml-sidebar min-h-screen max-w-[1800px] px-6 sm:px-8 lg:px-12 relative transition-[margin-left] duration-[var(--sidebar-dur)] ease-[var(--sidebar-ease)]">
         {children}
       </main>
     </div>

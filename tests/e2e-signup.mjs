@@ -2,11 +2,11 @@
  * End-to-end check of the signup trigger against the live project.
  *
  * Verifies that a newly created auth user automatically receives a profile and
- * the five starter categories — the flow the onboarding depends on and that
- * previously dead-ended.
+ * no starter rows — the flow the onboarding depends on, which previously
+ * dead-ended when categories were seeded.
  *
- * It also asserts that no salary record is created, since a history entry is
- * meant to exist only for a month the user actually saved one.
+ * It also asserts that no income row is created: a fresh account has recorded
+ * no money in, so it has no history to show yet.
  *
  * Usage: node tests/e2e-signup.mjs
  *
@@ -69,10 +69,10 @@ if (!signUp.session) {
   check('akun bisa langsung dipakai masuk', !signInError);
 }
 
-const [profileRes, budgetsRes, salaryRes] = await Promise.all([
+const [profileRes, budgetsRes, incomesRes] = await Promise.all([
   supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
   supabase.from('budgets').select('*').eq('user_id', userId).order('created_at'),
-  supabase.from('salary_records').select('*').eq('user_id', userId),
+  supabase.from('incomes').select('*').eq('user_id', userId),
 ]);
 
 check('profil dibuat otomatis', !profileRes.error && Boolean(profileRes.data));
@@ -81,10 +81,10 @@ check('profil dibuat otomatis', !profileRes.error && Boolean(profileRes.data));
 // signup now lands on an empty budget list and the user names their own.
 check('tidak ada kategori template yang dibuat otomatis', !budgetsRes.error && budgetsRes.data?.length === 0);
 // No placeholder row: a brand-new account has entered nothing, so it must not
-// show up in the salary history or on /history.
+// show up on /history — that page only lists months with an income or expense.
 check(
-  'tidak ada salary record sebelum user menyimpan gaji',
-  !salaryRes.error && salaryRes.data?.length === 0,
+  'tidak ada pemasukan otomatis sebelum user mencatat pemasukan',
+  !incomesRes.error && incomesRes.data?.length === 0,
 );
 
 // A new user must not be able to read another user's rows.

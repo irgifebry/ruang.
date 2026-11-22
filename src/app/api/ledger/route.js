@@ -5,23 +5,13 @@ import { auth } from '@/lib/auth';
 import { getPool } from '@/lib/db';
 import {
   isRecord,
-  validAmount,
   validBudget,
-  validDate,
   validExpense,
   validId,
   validIncome,
   validMonths,
 } from '@/lib/ledger-validation';
-import {
-  currentMonthKey,
-  monthEnd,
-  monthKey,
-  monthStart,
-  shiftMonth,
-  toNumber,
-  toPositive,
-} from '@/lib/money';
+import { currentMonthKey, monthKey, shiftMonth, toNumber } from '@/lib/money';
 
 /**
  * The profile row plus the account's provider photo.
@@ -71,11 +61,15 @@ async function readJsonBody(request, maxBytes) {
 
 export async function POST(request) {
   try {
+    // Every action here is a state-changing POST. A browser sends `Origin` on
+    // those, so a request without one has to prove its provenance another way:
+    // `sec-fetch-site: same-origin`. Cross-site is rejected in both branches,
+    // while normal same-origin navigation and fetches keep working.
     const origin = request.headers.get('origin');
     if (origin && origin !== new URL(request.url).origin) {
       return errorResponse('Permintaan ditolak.', 403);
     }
-    if (!origin && request.headers.get('sec-fetch-site') === 'cross-site') {
+    if (!origin && request.headers.get('sec-fetch-site') !== 'same-origin') {
       return errorResponse('Permintaan ditolak.', 403);
     }
 
@@ -113,9 +107,7 @@ export async function POST(request) {
 
     switch (action) {
       case 'fetchLedger': {
-        const currentMonth = monthStart(new Date());
-
-        const [profileRes, budgetsRes, expensesRes, salaryRes, incomesRes] = await Promise.all([
+        const [profileRes, budgetsRes, expensesRes, incomesRes] = await Promise.all([
           pool.query(PROFILE_SELECT, [userId]),
           pool.query('SELECT * FROM budgets WHERE user_id = $1 ORDER BY created_at ASC', [userId]),
           pool.query(
@@ -134,16 +126,9 @@ export async function POST(request) {
             ORDER BY e.spent_on DESC, e.created_at DESC`,
             [userId]
           ),
-          pool.query(
-            `SELECT user_id, to_char(month, 'YYYY-MM-DD') AS month, amount::numeric, updated_at
-            FROM salary_records
-            WHERE user_id = $1
-            ORDER BY month DESC`,
-            [userId]
-          ),
           // Unpaged, like `expenses`: the transactions screen filters by month
-          // in the browser and a salary that lands on the 28th must not fall
-          // out of the set because it was the newest row in a long history.
+          // in the browser, so an income dated late in a long history must not
+          // fall out of the set for being newest.
           pool.query(
             `SELECT id, description, source, amount::numeric,
               to_char(received_on, 'YYYY-MM-DD') AS received_on, created_at
@@ -163,12 +148,6 @@ export async function POST(request) {
           ...e,
           amount: toNumber(e.amount),
         }));
-        const salaryRecords = salaryRes.rows.map((r) => ({
-          key: monthKey(r.month),
-          month: r.month,
-          amount: toNumber(r.amount),
-          updatedAt: r.updated_at,
-        }));
         const incomes = incomesRes.rows.map((row) => ({
           ...row,
           // A blank label is stored as NULL by the API, but an empty string from
@@ -178,42 +157,7 @@ export async function POST(request) {
           amount: toNumber(row.amount),
         }));
 
-        const currentSalaryRow = salaryRecords.find((r) => r.month === currentMonth);
-        const salary = toPositive(currentSalaryRow?.amount ?? profile?.salary);
-
-        const series =
-          salaryRecords.length === 0 && salary > 0
-            ? [{ key: currentMonthKey(), month: currentMonth, amount: salary, updatedAt: null }]
-            : salaryRecords;
-
-        return NextResponse.json({
-          profile,
-          salary,
-          budgets,
-          expenses,
-          incomes,
-          salaryRecords: series,
-        });
-      }
-
-      case 'fetchSalaryHistory': {
-        const months = body.months === undefined ? 12 : Number(body.months);
-        if (!validMonths(months)) return errorResponse('Rentang bulan tidak valid.');
-        const res = await pool.query(
-          `SELECT user_id, to_char(month, 'YYYY-MM-DD') AS month, amount::numeric, updated_at
-          FROM salary_records
-          WHERE user_id = $1
-          ORDER BY month DESC
-          LIMIT $2`,
-          [userId, months]
-        );
-        const records = res.rows.map((r) => ({
-          key: monthKey(r.month),
-          month: r.month,
-          amount: toNumber(r.amount),
-          updatedAt: r.updated_at,
-        }));
-        return NextResponse.json(records);
+        return NextResponse.json({ profile, budgets, expenses, incomes });
       }
 
       case 'fetchMonthlyBreakdown': {
@@ -276,6 +220,14 @@ export async function POST(request) {
             source: income.source || null,
             amount: toNumber(income.amount),
           });
+        }
+
+        // A month that has money in but nothing out still gets an empty
+        // spending bucket. The history is built from the union of income and
+        // expense month keys, so it must arrive with `spent = 0`, not be
+        // missing altogether.
+        for (const key of Object.keys(incomesByMonth)) {
+          if (!byMonth[key]) byMonth[key] = [];
         }
 
         return NextResponse.json({ budgets, byMonth, incomesByMonth });
@@ -381,23 +333,6 @@ export async function POST(request) {
         const { id, input } = body;
         if (!validId(id) || !validBudget(input)) return errorResponse('Data kategori tidak valid.');
 
-        // Server-side cap: sum of all other categories plus the new limit must
-        // not exceed salary. Excludes the budget being updated from the sum.
-        const [profileRes, budgetSumRes] = await Promise.all([
-          pool.query('SELECT salary FROM profiles WHERE id = $1', [userId]),
-          pool.query(
-            'SELECT COALESCE(SUM(monthly_limit), 0) AS total FROM budgets WHERE user_id = $1 AND id != $2',
-            [userId, id],
-          ),
-        ]);
-        const salary = toNumber(profileRes.rows[0]?.salary ?? 0);
-        if (salary > 0) {
-          const existing = toNumber(budgetSumRes.rows[0]?.total ?? 0);
-          if (existing + toNumber(input.monthlyLimit) > salary) {
-            return errorResponse('Total anggaran melebihi gaji.', 400);
-          }
-        }
-
         const result = await pool.query(
           `UPDATE budgets
           SET name = $1, monthly_limit = $2, color = $3
@@ -413,37 +348,6 @@ export async function POST(request) {
         if (!validId(id)) return errorResponse('ID kategori tidak valid.');
         const result = await pool.query('DELETE FROM budgets WHERE id = $1 AND user_id = $2', [id, userId]);
         if (!result.rowCount) return errorResponse('Kategori tidak ditemukan.', 404);
-        return NextResponse.json({ success: true });
-      }
-
-      case 'saveSalary': {
-        const { month, amount } = body;
-        if (!validDate(month, true) || !validAmount(amount, true)) {
-          return errorResponse('Data gaji tidak valid.');
-        }
-        const client = await pool.connect();
-        try {
-          await client.query('BEGIN');
-          await client.query(
-            `INSERT INTO salary_records (user_id, month, amount, updated_at)
-            VALUES ($1, $2, $3, now())
-            ON CONFLICT (user_id, month)
-            DO UPDATE SET amount = EXCLUDED.amount, updated_at = now()`,
-            [userId, month, amount]
-          );
-
-          if (monthKey(month) === currentMonthKey()) {
-            await client.query('UPDATE profiles SET salary = $1 WHERE id = $2', [amount, userId]);
-          }
-          await client.query('COMMIT');
-        } catch (err) {
-          try {
-            await client.query('ROLLBACK');
-          } catch {}
-          throw err;
-        } finally {
-          client.release();
-        }
         return NextResponse.json({ success: true });
       }
 
@@ -486,26 +390,53 @@ export async function POST(request) {
           values.push(patch.avatar_path);
         }
 
-        if (fields.length > 0) {
-          values.push(userId);
-          const res = await pool.query(`UPDATE profiles SET ${fields.join(', ')} WHERE id = $${idx}`, values);
-          if (res.rowCount === 0) return errorResponse('Profil tidak ditemukan.', 404);
+        // One transaction for all three writes. The profile row, the display
+        // name on Better Auth's `"user"` and the provider image are one logical
+        // change: a failure between them used to leave the two tables out of
+        // step, with no way for the client to know.
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
 
-          if ('name' in patch && patch.name) {
-            await pool.query('UPDATE "user" SET name = $1 WHERE id = $2', [patch.name.trim(), userId]);
+          if (fields.length > 0) {
+            values.push(userId);
+            const res = await client.query(
+              `UPDATE profiles SET ${fields.join(', ')} WHERE id = $${idx}`,
+              values,
+            );
+            if (res.rowCount === 0) {
+              await client.query('ROLLBACK');
+              return errorResponse('Profil tidak ditemukan.', 404);
+            }
+
+            if ('name' in patch && patch.name) {
+              await client.query('UPDATE "user" SET name = $1 WHERE id = $2', [
+                patch.name.trim(),
+                userId,
+              ]);
+            }
           }
-        }
 
-        // The provider photo is not a `profiles` column — it is the picture
-        // Google handed over at sign-in, stored on `"user".image`. Only clearing
-        // it is allowed: accepting a URL from the browser would let the client
-        // point the avatar at anything, including a tracking pixel. A new photo
-        // comes from Google itself, or from an upload into `avatar_path`.
-        if ('provider_image' in patch) {
-          await pool.query('UPDATE "user" SET image = $1 WHERE id = $2', [
-            patch.provider_image ?? null,
-            userId,
-          ]);
+          // The provider photo is not a `profiles` column — it is the picture
+          // Google handed over at sign-in, stored on `"user".image`. Only clearing
+          // it is allowed: accepting a URL from the browser would let the client
+          // point the avatar at anything, including a tracking pixel. A new photo
+          // comes from Google itself, or from an upload into `avatar_path`.
+          if ('provider_image' in patch) {
+            await client.query('UPDATE "user" SET image = $1 WHERE id = $2', [
+              patch.provider_image ?? null,
+              userId,
+            ]);
+          }
+
+          await client.query('COMMIT');
+        } catch (err) {
+          try {
+            await client.query('ROLLBACK');
+          } catch {}
+          throw err;
+        } finally {
+          client.release();
         }
 
         return NextResponse.json({ success: true });

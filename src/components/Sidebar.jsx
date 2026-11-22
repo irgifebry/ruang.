@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { getSharedSession, signOut } from '@/lib/auth-client';
 import { clearIdleState } from '@/lib/idle-logout';
 import { toggleSidebar, isRailToggleClick, blockWheelScroll } from '@/lib/sidebar';
+import { avatarUrl } from '@/lib/avatar';
 import { useProfile } from '@/hooks/useProfile';
 import {
   CloseIcon,
@@ -129,7 +130,7 @@ export default function Sidebar({ session, onSignOut, signingOut }) {
           so exactly one of the two is ever in the layout. */}
       <header
         ref={barRef}
-        className="lg:hidden fixed inset-x-0 top-0 z-40 h-[56px] flex items-center justify-between px-[16px] border-b border-ruang-line bg-ruang-shell/95 backdrop-blur"
+        className="lg:hidden fixed inset-x-0 top-0 z-40 h-mobile-bar flex items-center justify-between px-[16px] border-b border-ruang-line bg-ruang-shell/95 backdrop-blur"
       >
         <Brand />
         <button
@@ -323,6 +324,7 @@ function UserBlock({ session, onSignOut, signingOut }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuMounted, setMenuMounted] = useState(false);
   const menuTimer = useRef(null);
+  const menuTriggerRef = useRef(null);
   const pathname = usePathname();
 
   useEffect(() => () => clearTimeout(menuTimer.current), []);
@@ -353,6 +355,20 @@ function UserBlock({ session, onSignOut, signingOut }) {
     closeMenu();
   }, [pathname, closeMenu]);
 
+  // Escape dismisses the popover and returns focus to the trigger, the same way
+  // the mobile drawer and a native dialog do. Tabbing into a menu with no way
+  // out but "navigate somewhere else" is a keyboard trap in all but name.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      closeMenu();
+      menuTriggerRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [menuOpen, closeMenu]);
+
   const toggleMenu = () => {
     clearTimeout(menuTimer.current);
     if (menuOpen) {
@@ -371,16 +387,12 @@ function UserBlock({ session, onSignOut, signingOut }) {
   // full reload instead of being served stale out of the browser cache.
   const avatarSrc = !resolved
     ? null
-    : profile?.avatar_path
-      ? process.env.NEXT_PUBLIC_SUPABASE_URL +
-        '/storage/v1/object/public/avatars/' +
-        encodeURI(profile.avatar_path) +
-        (version ? `?v=${version}` : '')
-      : profile?.provider_image || null;
+    : avatarUrl(profile?.avatar_path, version) ?? profile?.provider_image ?? null;
 
   return (
     <div className="group relative mt-auto pt-[16px] border-t border-ruang-line">
       <button
+        ref={menuTriggerRef}
         type="button"
         onClick={toggleMenu}
         aria-expanded={menuOpen}
@@ -399,7 +411,7 @@ function UserBlock({ session, onSignOut, signingOut }) {
         </span>
         <span className="sidebar-label ml-auto w-[6px] h-[6px] bg-ruang-accent rounded-full flex-none" aria-hidden="true" />
       </button>
-      {menuMounted && <nav id="sidebar-account-menu" aria-label="Pengaturan akun" className={`account-menu border border-ruang-line bg-ruang-shell p-[12px] shadow-lg ${menuOpen ? 'account-menu-open' : ''}`}>
+      {menuMounted && <nav id="sidebar-account-menu" aria-label="Pengaturan akun" aria-hidden={!menuOpen} inert={!menuOpen} className={`account-menu border border-ruang-line bg-ruang-shell p-[12px] shadow-lg ${menuOpen ? 'account-menu-open' : ''}`}>
         <p className="font-mono text-[10px] tracking-[0.12em] text-ruang-subtle uppercase px-[8px] mb-[6px]">Pengaturan akun</p>
         {[
           { href: '/settings/profile', label: 'Profil' },

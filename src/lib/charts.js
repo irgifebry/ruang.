@@ -83,8 +83,8 @@ export function arcPath({ cx, cy, outerRadius, innerRadius, startAngle, endAngle
  * Turns `{ id, name, value, color }` items into donut slices with angles.
  *
  * `total` is the ring's full circle. It defaults to the sum of the values, which
- * gives a closed ring; passing something larger (a monthly salary, say) draws a
- * partial ring so the unspent remainder reads as empty track.
+ * gives a closed ring; passing something larger (the month's income, say) draws
+ * a partial ring so the unspent remainder reads as empty track.
  *
  * Slices are sorted largest-first so the eye lands on the dominant category and
  * the legend can be rendered in the same order as the ring.
@@ -210,12 +210,9 @@ export function spendByMonth(expenses = [], month, count = 6) {
 /**
  * Money in and money out per month, oldest first — the cashflow chart's series.
  *
- * `inflow` is the salary for the month plus every income row dated in it. The
- * salary is part of the same series on purpose: it is income, it is what the
- * month was funded by, and a chart whose "Masuk" row read Rp 0 for every month
- * except the ones the user happened to record a THR in would be answering a
- * question nobody asked. `salary` and `extra` are also returned separately, so
- * a caller can label which part of a month's inflow was not the salary.
+ * There is one money-in figure: the sum of every income row dated in the month.
+ * No separate salary series is fetched or split out, so the rows carry only
+ * `inflow`, `outflow` and `net`.
  *
  * The window is fixed at `count` months ending at `month`, for the same reason
  * `spendByMonth` fixes it: a bar row that loses a column when an old month is
@@ -225,7 +222,7 @@ export function spendByMonth(expenses = [], month, count = 6) {
  * month and a month with nothing in it look identical on a bar chart, and only
  * one of them means "the user did nothing".
  */
-export function cashflowByMonth(incomes = [], expenses = [], salaryRecords = [], month, count = 6) {
+export function cashflowByMonth(incomes = [], expenses = [], month, count = 6) {
   const total = Math.max(0, Math.trunc(toNumber(count)));
   if (!total || !month) return [];
 
@@ -233,24 +230,14 @@ export function cashflowByMonth(incomes = [], expenses = [], salaryRecords = [],
   for (let offset = total - 1; offset >= 0; offset -= 1) keys.push(shiftMonth(month, -offset));
 
   const inWindow = new Set(keys);
-  const extraByMonth = new Map(keys.map((key) => [key, 0]));
+  const incomeByMonth = new Map(keys.map((key) => [key, 0]));
   const spendByMonthKey = new Map(keys.map((key) => [key, 0]));
-
-  // `salaryRecords` arrives either as the ledger's `{ key, amount }` rows or as
-  // the raw `{ month, salary }` rows the history page has. Both shapes are read
-  // here so the caller never has to reshape before charting.
-  const salaryByMonth = new Map();
-  for (const record of Array.isArray(salaryRecords) ? salaryRecords : []) {
-    const key = typeof record?.key === 'string' ? record.key : monthKey(record?.month);
-    if (!key) continue;
-    salaryByMonth.set(key, toPositive(record?.amount ?? record?.salary));
-  }
 
   for (const income of Array.isArray(incomes) ? incomes : []) {
     const date = toDate(income?.received_on);
     if (!date) continue;
     const key = monthKey(date);
-    if (inWindow.has(key)) extraByMonth.set(key, extraByMonth.get(key) + toPositive(income.amount));
+    if (inWindow.has(key)) incomeByMonth.set(key, incomeByMonth.get(key) + toPositive(income.amount));
   }
 
   for (const expense of Array.isArray(expenses) ? expenses : []) {
@@ -261,16 +248,12 @@ export function cashflowByMonth(incomes = [], expenses = [], salaryRecords = [],
   }
 
   return keys.map((key) => {
-    const salary = salaryByMonth.get(key) ?? 0;
-    const extra = extraByMonth.get(key);
+    const inflow = incomeByMonth.get(key);
     const outflow = spendByMonthKey.get(key);
-    const inflow = salary + extra;
 
     return {
       key,
       label: shortMonthLabel(key),
-      salary,
-      extra,
       inflow,
       outflow,
       net: inflow - outflow,

@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useLedgerData } from '@/hooks/useLedgerData';
-import { buildHistoryRows, fetchMonthlyBreakdown, fetchSalaryHistory } from '@/lib/ledger';
+import { buildHistoryRows, fetchMonthlyBreakdown } from '@/lib/ledger';
 import {
   formatIDR,
   formatIDRCompact,
@@ -14,22 +14,17 @@ import { EmptyState, ErrorState, Eyebrow, LoadingState, Panel } from '@/componen
 
 const MONTHS_WINDOW = 12;
 
-/** Salary per month and spending grouped by month, fetched together. */
-const loadHistory = async (supabase) => {
-  const [salaryRows, breakdown] = await Promise.all([
-    fetchSalaryHistory(supabase, MONTHS_WINDOW),
-    fetchMonthlyBreakdown(supabase, MONTHS_WINDOW),
-  ]);
-  // `breakdown` carries `incomesByMonth` through untouched; it is spread here
-  // so `buildHistoryRows` receives the same key it reads on a full fetch.
-  return { salaryRows, ...breakdown };
-};
+/**
+ * One fetch: the breakdown already buckets every month that has an income or an
+ * expense, which is exactly the set `buildHistoryRows` turns into rows.
+ */
+const loadHistory = () => fetchMonthlyBreakdown(MONTHS_WINDOW);
 
 export default function HistoryPage() {
   const { data, loading, error, reload } = useLedgerData(loadHistory);
   // All hooks run before any early return, so the hook order stays stable
   // across loading -> loaded transitions.
-  const rows = useMemo(() => buildHistoryRows(data), [data]);
+  const rows = useMemo(() => buildHistoryRows(data ?? {}), [data]);
 
   if (loading) return <LoadingState label="Memuat riwayat..." />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
@@ -49,10 +44,10 @@ export default function HistoryPage() {
       {rows.length === 0 ? (
         <Panel>
           <EmptyState>
-            Belum ada riwayat. Simpan gaji dan catat pengeluaran supaya bulan itu muncul di sini.
+            Belum ada riwayat. Sebuah bulan masuk riwayat begitu ada pemasukan atau pengeluaran yang tercatat di dalamnya.
             <br />
-            <Link href="/settings" className="text-ruang-accent-text underline underline-offset-2">
-              Simpan gaji bulan ini
+            <Link href="/transactions" className="text-ruang-accent-text underline underline-offset-2">
+              Catat pemasukan pertama
             </Link>
           </EmptyState>
         </Panel>
@@ -119,20 +114,19 @@ export default function HistoryPage() {
                       {/* Four facts, two lines. They were three spans in one `flex-wrap` plus a
                           paragraph, so on a phone each landed on its own line
                           and one month took four rows of height for two
-                          numbers. The salary pair is a two-column grid with the
+                          numbers. The in/out pair is a two-column grid with the
                           label above the amount — the same stat-pair shape the
-                          dashboard cards use — and the share of salary moved
+                          dashboard cards use — and the share of inflow moved
                           into the label, where it costs no extra line. The
                           transaction count and the top category share the row
                           underneath, which is wide enough for both. */}
                       <div className="mt-[13px] grid grid-cols-2 gap-card">
                         <div className="min-w-0">
                           <small className="block font-mono text-[10px] uppercase tracking-[0.09em] text-ruang-subtle mb-[5px]">
-                            {/* "Masuk" rather than "Gaji": the figure is the
-                                month's whole inflow, so a month with a bonus in
-                                it shows more than the salary. The breakdown
-                                underneath says so rather than leaving the label
-                                to be read literally. */}
+                            {/* "Masuk" is the month's whole pemasukan — every
+                                income dated in it, without a separate fixed
+                                figure underneath. The line below names how many
+                                income records make it up. */}
                             Masuk
                           </small>
                           <strong className="block text-[13px] font-medium tracking-[-0.02em] text-ruang-ink truncate">
@@ -151,15 +145,12 @@ export default function HistoryPage() {
 
                       {/* Only the months that actually have income rows, so a
                           normal month does not gain a line saying there was
-                          none. */}
-                      {row.income > 0 && (
+                          none. The count is the useful part here — the amount
+                          itself is already in "Masuk" above. */}
+                      {row.incomeCount > 0 && (
                         <div className="mt-[8px] text-[12px] text-ruang-muted leading-[1.5]">
-                          Termasuk pemasukan lain{' '}
+                          {row.incomeCount} catatan pemasukan ·{' '}
                           <span className="font-mono text-ruang-ink">{formatIDR(row.income)}</span>
-                          <span className="text-ruang-subtle">
-                            {' '}
-                            dari {row.incomeCount} catatan
-                          </span>
                         </div>
                       )}
 
@@ -194,9 +185,9 @@ export default function HistoryPage() {
       <div className="border border-ruang-line p-card mt-section flex items-start gap-[12px]">
         <span className="w-[7px] h-[7px] bg-ruang-accent flex-none mt-[6px]" />
         <p className="text-[13px] text-ruang-muted leading-[1.65]">
-          Riwayat dihitung dari transaksi yang tersimpan di akunmu. Sebuah bulan masuk riwayat setelah kamu
-          menyimpan gaji untuk bulan itu, jadi menaikkan gaji bulan ini tidak mengubah angka bulan-bulan
-          sebelumnya. Pemasukan di luar gaji ikut dihitung sebagai bagian dari dana yang masuk pada bulan itu.
+          Riwayat dihitung dari transaksi yang tersimpan di akunmu. Sebuah bulan masuk riwayat begitu ada
+          pemasukan atau pengeluaran yang tercatat di dalamnya. Angka di atas adalah selisih antara dana
+          yang masuk dan yang keluar pada bulan itu.
         </p>
       </div>
     </div>

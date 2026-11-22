@@ -220,7 +220,7 @@ export function SelectField({
  *
  * `whitespace-nowrap` on the label is deliberate. Beside a cancel button on a
  * narrow dialog, a label like "Simpan transaksi" would otherwise break across
- * two lines at an arbitrary point — "Simpan" / "gaji" — and the button grew
+ * two lines at an arbitrary point — "Simpan" / "transaksi" — and the button grew
  * past its fixed 42px height. A nowrap label makes the pair overflow instead,
  * which is why the rows that hold a primary and a ghost button wrap their
  * children rather than forcing them to share one line.

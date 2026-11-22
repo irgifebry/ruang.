@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
+import { getAuthoritativeSession } from '@/lib/auth-session';
 import { getPool } from '@/lib/db';
 import { cancelDeletion, requestDeletion } from '@/lib/account-purge';
 
@@ -39,9 +40,16 @@ function isSameOrigin(request) {
   return origin === request.nextUrl.origin;
 }
 
-/** Reads the session from the request cookies. */
+/**
+ * Reads the session from the server-side store, never from the cookie cache.
+ *
+ * Every handler below gates on this — password creation, deletion request and
+ * cancellation included. A cached revocation decision is acceptable for a
+ * ledger read; it is not acceptable for an operation that revokes or destroys
+ * an account.
+ */
 async function currentUser() {
-  const session = await auth.api.getSession({ headers: await headers() });
+  const session = await getAuthoritativeSession(await headers());
   return session?.user ?? null;
 }
 

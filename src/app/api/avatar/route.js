@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
-import { auth } from '@/lib/auth';
+import { getAuthoritativeSession } from '@/lib/auth-session';
 import { getPool } from '@/lib/db';
 
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -63,7 +63,9 @@ async function currentUser(request) {
   const origin = request.headers.get('origin');
   if (origin && origin !== new URL(request.url).origin) return null;
   if (!origin && request.headers.get('sec-fetch-site') === 'cross-site') return null;
-  const session = await auth.api.getSession({ headers: await headers() });
+  // Avatar writes mutate both Storage and the profile row, so they gate on a
+  // session read straight from the store rather than the cookie cache.
+  const session = await getAuthoritativeSession(await headers());
   return session?.user ?? null;
 }
 

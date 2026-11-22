@@ -11,6 +11,21 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const emailFrom = process.env.EMAIL_FROM || 'Ruang <onboarding@resend.dev>';
 
 /**
+ * The reset URL is built from request-controlled values (origin, token, `next`).
+ * Interpolating it raw into an HTML attribute or text node turns a reset email
+ * into an injection vector, so every metacharacter is escaped before it goes
+ * near the template. The token itself is never printed — only the URL is.
+ */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Google is opt-in through the environment rather than always declared.
  *
  * Better Auth registers a provider as soon as it appears in `socialProviders`,
@@ -58,9 +73,37 @@ if (turnstileSecretKey) {
     captcha({
       provider: 'cloudflare-turnstile',
       secretKey: turnstileSecretKey,
-      endpoints: ['/sign-in/email', '/sign-up/email'],
+      // The login form already sends `x-captcha-response` on all three flows.
+      // Social sign-in creates a session too, so leaving it out would make the
+      // captcha a detour around itself.
+      endpoints: ['/sign-in/email', '/sign-up/email', '/sign-in/social'],
     }),
   );
+}
+
+/**
+ * Shared by the `create` and `update` session hooks. A refresh is a session
+ * update in Better Auth, so registering only `create` left a flagged account
+ * able to keep using a refreshed cookie without ever clearing the flag.
+ *
+ * Fail-open on purpose: an error in the sweep query must never lock out every
+ * sign-in. The cron is still the backstop that destroys an expired account.
+ */
+async function reconcileBeforeSession(session) {
+  if (!session?.userId) return undefined;
+  try {
+    const outcome = await reconcileOnSignIn(session.userId);
+    if (outcome === 'deleted') {
+      console.warn('[auth] Sign-in refused: the account was deleted after its grace period.');
+      return false;
+    }
+    if (outcome === 'restored') {
+      console.info('[auth] Sign-in restored an account pending deletion.');
+    }
+  } catch (error) {
+    console.error('[auth] Could not reconcile a pending account deletion:', error);
+  }
+  return undefined;
 }
 
 export const auth = betterAuth({
@@ -75,11 +118,13 @@ export const auth = betterAuth({
         return await bcrypt.compare(password, hash);
       },
     },
-    sendResetPassword: async ({ user, url, token }) => {
+    sendResetPassword: async ({ user, url }) => {
       if (!resend) {
         console.error('[Password Reset] RESEND_API_KEY not configured. Email not sent.');
         return;
       }
+
+      const safeUrl = escapeHtml(url);
 
       try {
         const { error } = await resend.emails.send({
@@ -93,7 +138,7 @@ export const auth = betterAuth({
                 Kami menerima permintaan untuk mereset kata sandi akun Anda di <strong>ruang.</strong>. Klik tombol di bawah ini untuk membuat kata sandi baru:
               </p>
               <div style="margin-bottom: 24px;">
-                <a href="${url}" style="background-color: #111827; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
+                <a href="${safeUrl}" style="background-color: #111827; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
                   Atur Ulang Kata Sandi
                 </a>
               </div>
@@ -101,7 +146,7 @@ export const auth = betterAuth({
                 Jika tombol di atas tidak berfungsi, salin dan buka tautan ini di browser:
               </p>
               <p style="font-size: 12px; word-break: break-all; color: #2563eb;">
-                <a href="${url}" style="color: #2563eb;">${url}</a>
+                <a href="${safeUrl}" style="color: #2563eb;">${safeUrl}</a>
               </p>
               <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
               <p style="font-size: 12px; color: #9ca3af;">
@@ -119,6 +164,33 @@ export const auth = betterAuth({
       } catch (err) {
         console.error('[Password Reset] Failed to send email via Resend:', err);
       }
+    },
+  },
+  /**
+   * Built-in rate limiting, keyed by client IP (Vercel forwards
+   * `x-forwarded-for`, and `advanced.trustedProxyHeaders` is on below).
+   *
+   * The auth endpoints get tighter rules than the 60/minute default: ten
+   * password or social sign-ins, five sign-ups and five reset requests per
+   * minute per address. That still leaves room for retries on a slow network,
+   * for password managers and for the e2e scripts, while putting a ceiling on
+   * credential stuffing and reset-email flooding. Completing a reset gets a
+   * little more headroom because a person may be pasting from an email client.
+   *
+   * Storage is the built-in in-memory one, so the limit is per server instance
+   * on serverless. It is a speed bump, not a distributed quota — a durable
+   * secondary storage would be needed for a global one.
+   */
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      '/sign-in/email': { window: 60, max: 10 },
+      '/sign-in/social': { window: 60, max: 10 },
+      '/sign-up/email': { window: 60, max: 5 },
+      '/request-password-reset': { window: 60, max: 5 },
+      '/reset-password': { window: 60, max: 10 },
     },
   },
   session: {
@@ -176,37 +248,18 @@ export const auth = betterAuth({
    *
    * `/settings/profile` flags the account and signs the user out rather than
    * deleting anything, so "masuk lagi" is the only thing that has to bring it
-   * back — and this hook is the one place every sign-in passes through, whether
-   * it arrives with a password, through Google, or from a session that was
-   * merely refreshed.
+   * back. `create` covers password and Google sign-ins; `update` covers a
+   * refreshed session, which otherwise kept a flagged account alive without
+   * ever clearing its flag. Both use the same fail-open helper above.
    *
-   * Returning `false` aborts the session insert, which is what makes an expired
+   * Returning `false` aborts the session write, which is what makes an expired
    * account actually gone: `reconcileOnSignIn` has already destroyed its rows at
    * that point, so the sign-in that follows is refused rather than served.
    */
   databaseHooks: {
     session: {
-      create: {
-        before: async (session) => {
-          try {
-            const outcome = await reconcileOnSignIn(session.userId);
-            if (outcome === 'deleted') {
-              console.warn('[auth] Sign-in refused: the account was deleted after its grace period.');
-              return false;
-            }
-            if (outcome === 'restored') {
-              console.info('[auth] Sign-in restored an account pending deletion.');
-            }
-          } catch (error) {
-            // Fails open. Blocking every login because the sweep query failed
-            // would be a far worse outcome than letting one flagged account in
-            // for the hour before the cron notices — and the cron destroys it
-            // regardless of what happens here.
-            console.error('[auth] Could not reconcile a pending account deletion:', error);
-          }
-          return undefined;
-        },
-      },
+      create: { before: reconcileBeforeSession },
+      update: { before: reconcileBeforeSession },
     },
   },
   user: {

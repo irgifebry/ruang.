@@ -3,17 +3,8 @@
  * Centralising here keeps validation and consistent formatting clean.
  */
 
-import {
-  currentMonthKey,
-  monthEnd,
-  monthKey,
-  monthStart,
-  ratioPercent,
-  shiftMonth,
-  toNumber,
-  toPositive,
-  todayISO,
-} from './money.js';
+import { ratioPercent, toNumber, toPositive } from './money.js';
+import { AMOUNT_MAX } from './ledger-validation.js';
 import { getSharedSession } from './auth-client.js';
 
 /** Thrown for anything the user should see a message about, not a stack trace. */
@@ -52,71 +43,80 @@ export async function fetchLedger() {
 /**
  * One row per month for the history page.
  *
- * A month qualifies once its salary has been *saved* — that has always been the
- * rule, and it is what keeps an untouched month from filling the list with rows
- * the user never entered anything into. Income recorded without a salary does
- * not promote a month into the history for the same reason: the history is a
- * per-month statement, and without a salary the row has no funding to report.
+ * A month qualifies once it has money in *or* money out — an untouched month
+ * must not fill the list with zero rows. There is no second funding source to
+ * carry forward: the whole inflow for a month is the sum of its income rows,
+ * so an income-only month is a complete statement with `spent = 0`.
  *
- * `saved` is now measured against the month's whole inflow (salary plus every
- * income row dated in it) rather than the salary alone. `salary` and `income`
- * are both returned so the page can show the breakdown.
+ * `months` is the breakdown from `fetchMonthlyBreakdown`; its keys are already
+ * the union of income and expense months. `incomesByMonth` is read as well so a
+ * caller that hands over only expense buckets still gets the income months.
  */
 export function buildHistoryRows(data) {
-  const { salaryRows = [], months = [], budgets = [], incomesByMonth = {} } = data ?? {};
-  const salaryByMonth = new Map(
-    salaryRows
-      .map((row) => [row.month, toPositive(row.salary)])
-      .filter(([, salary]) => salary > 0),
+  const source = data !== null && typeof data === 'object' ? data : {};
+  const months = Array.isArray(source.months) ? source.months : [];
+  const budgets = Array.isArray(source.budgets) ? source.budgets : [];
+  const incomesByMonth =
+    source.incomesByMonth !== null && typeof source.incomesByMonth === 'object' &&
+    !Array.isArray(source.incomesByMonth)
+      ? source.incomesByMonth
+      : {};
+
+  const incomeRowsByMonth = new Map(
+    Object.entries(incomesByMonth).map(([key, rows]) => [
+      key,
+      Array.isArray(rows) ? rows : [],
+    ]),
+  );
+  const incomeByMonth = new Map(
+    [...incomeRowsByMonth].map(([key, rows]) => [
+      key,
+      rows.reduce((sum, row) => sum + toPositive(row?.amount), 0),
+    ]),
   );
 
-  return months
-    .filter((month) => salaryByMonth.has(`${month.key}-01`))
-    .map((month) => {
-      const salary = salaryByMonth.get(`${month.key}-01`);
-      const spent = month.spent;
-      const monthIncomes = incomesByMonth[month.key] ?? [];
-      const income = monthIncomes.reduce((sum, row) => sum + toPositive(row?.amount), 0);
-      const inflow = salary + income;
+  const monthByKey = new Map(months.map((month) => [month?.key, month]));
+  const keys = new Set([...monthByKey.keys(), ...incomeByMonth.keys()]);
 
-      return {
-        ...month,
-        salary,
-        income,
-        inflow,
-        spent,
-        incomeCount: monthIncomes.length,
-        saved: inflow - spent,
-        savedPercent: ratioPercent(inflow - spent, inflow),
-        categories: budgets
-          .map((budget) => ({ ...budget, spent: month.byCategory[budget.id] ?? 0 }))
-          .filter((category) => category.spent > 0)
-          .sort((a, b) => b.spent - a.spent),
-      };
-    })
-    .sort((a, b) => b.key.localeCompare(a.key));
-}
+  const rows = [];
+  for (const key of keys) {
+    const month = monthByKey.get(key) ?? { key, spent: 0, count: 0, byCategory: {} };
+    const spent = toPositive(month?.spent);
+    const income = incomeByMonth.get(key) ?? 0;
+    // An empty bucket with no money either way is a month nobody touched.
+    if (income <= 0 && spent <= 0) continue;
 
-export async function fetchSalaryHistory(supabaseOrMonths, maybeMonths = 12) {
-  const months = typeof supabaseOrMonths === 'number' ? supabaseOrMonths : maybeMonths;
-  const data = await callLedger('fetchSalaryHistory', { months });
-  return (data ?? []).map((row) => ({
-    key: row.key,
-    month: row.month,
-    salary: toPositive(row.amount),
-  }));
+    const monthIncomes = incomeRowsByMonth.get(key) ?? [];
+    const byCategory = month?.byCategory !== null && typeof month?.byCategory === 'object'
+      ? month.byCategory
+      : {};
+
+    rows.push({
+      key,
+      income,
+      inflow: income,
+      spent,
+      saved: income - spent,
+      savedPercent: ratioPercent(income - spent, income),
+      incomeCount: monthIncomes.length,
+      categories: budgets
+        .map((budget) => ({ ...budget, spent: toPositive(byCategory[budget?.id]) }))
+        .filter((category) => category.spent > 0)
+        .sort((a, b) => b.spent - a.spent),
+    });
+  }
+
+  return rows.sort((a, b) => b.key.localeCompare(a.key));
 }
 
 /**
  * Budgets, monthly spending and monthly income over the last `months` months.
  *
- * `months` only ever contains buckets built from spending, which is what the
- * history list is made of. A month with income in it and no expenses at all
- * therefore has no bucket, and `buildHistoryRows` drops it for the same reason
- * it drops a month with no saved salary: nothing to compare the inflow against.
- * `incomesByMonth` is returned raw for exactly that reason — the bucket shape is
- * about spending, and a bucket-per-month for income would be a second, emptier
- * shape for the same key.
+ * `months` contains a bucket for every month that has an expense *or* an
+ * income. An income-only month still gets `{ spent: 0, count: 0, byCategory:
+ * {} }`, so `buildHistoryRows` can show it as a full statement instead of
+ * silently dropping it. `incomesByMonth` is also returned raw, because the
+ * history needs the individual entries for the count and the breakdown.
  */
 export async function fetchMonthlyBreakdown(supabaseOrMonths, maybeMonths = 12) {
   const months = typeof supabaseOrMonths === 'number' ? supabaseOrMonths : maybeMonths;
@@ -125,7 +125,9 @@ export async function fetchMonthlyBreakdown(supabaseOrMonths, maybeMonths = 12) 
   });
 
   const buckets = {};
-  for (const [key, expenses] of Object.entries(byMonth)) {
+  const keys = new Set([...Object.keys(byMonth ?? {}), ...Object.keys(incomesByMonth ?? {})]);
+  for (const key of keys) {
+    const expenses = Array.isArray(byMonth?.[key]) ? byMonth[key] : [];
     buckets[key] = { key, spent: 0, count: 0, byCategory: {} };
     for (const exp of expenses) {
       const amount = toPositive(exp.amount);
@@ -141,18 +143,6 @@ export async function fetchMonthlyBreakdown(supabaseOrMonths, maybeMonths = 12) 
     months: Object.values(buckets).sort((a, b) => b.key.localeCompare(a.key)),
     incomesByMonth,
   };
-}
-
-export async function fetchSalaryRecords() {
-  const data = await callLedger('fetchSalaryHistory', { months: 100 });
-  return (data ?? [])
-    .map((row) => ({
-      key: row.key,
-      month: row.month,
-      amount: toPositive(row.amount),
-      updatedAt: row.updatedAt ?? null,
-    }))
-    .filter((row) => row.amount > 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +166,7 @@ export function validateExpense({ description, amount, categoryId, spentOn }, bu
     errors.amount = 'Nominal harus angka bulat tanpa tanda baca.';
   } else if (toNumber(raw) <= 0) {
     errors.amount = 'Nominal harus lebih besar dari nol.';
-  } else if (toNumber(raw) > 1_000_000_000_000) {
+  } else if (toNumber(raw) > AMOUNT_MAX) {
     errors.amount = 'Nominal terlalu besar.';
   }
 
@@ -247,7 +237,7 @@ export function validateIncome({ description, amount, source, receivedOn }) {
     errors.amount = 'Nominal harus angka bulat tanpa tanda baca.';
   } else if (toNumber(raw) <= 0) {
     errors.amount = 'Nominal harus lebih besar dari nol.';
-  } else if (toNumber(raw) > 1_000_000_000_000) {
+  } else if (toNumber(raw) > AMOUNT_MAX) {
     errors.amount = 'Nominal terlalu besar.';
   }
 
@@ -291,7 +281,7 @@ export async function deleteIncome(arg1, arg2) {
 
 export const BUDGET_COLORS = ['lime', 'blue', 'orange', 'violet', 'pink'];
 
-export function validateBudget({ name, monthlyLimit }, { budgets = [], ignoreId = null, salary = 0 } = {}) {
+export function validateBudget({ name, monthlyLimit }, { budgets = [], ignoreId = null } = {}) {
   const errors = {};
   const clean = String(name ?? '').trim();
 
@@ -311,29 +301,11 @@ export function validateBudget({ name, monthlyLimit }, { budgets = [], ignoreId 
     errors.monthlyLimit = 'Isi batas bulanan.';
   } else if (!/^\d+$/.test(raw)) {
     errors.monthlyLimit = 'Batas harus angka bulat tanpa tanda baca.';
-  } else if (toNumber(raw) > 1_000_000_000_000) {
+  } else if (toNumber(raw) > AMOUNT_MAX) {
     errors.monthlyLimit = 'Batas terlalu besar.';
   }
 
-  if (salary > 0 && toNumber(raw) > 0) {
-    const otherBudgetsTotal = budgets
-      .filter((b) => b.id !== ignoreId)
-      .reduce((sum, b) => sum + toNumber(b.monthly_limit ?? b.limit ?? 0), 0);
-    const newTotal = otherBudgetsTotal + toNumber(raw);
-    if (newTotal > salary) {
-      errors.monthlyLimit = `Total anggaran (${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(newTotal)}) melebihi gaji (${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(salary)}). Kurangi batas atau tambah gaji di tab Pemasukan.`;
-    }
-  }
-
   return errors;
-}
-
-export function validateSalary(value) {
-  const raw = String(value ?? '').trim();
-  if (raw === '') return 'Isi gaji dengan angka nol atau lebih.';
-  if (!/^\d+$/.test(raw)) return 'Gaji harus angka bulat tanpa tanda baca.';
-  if (toNumber(raw) > 1_000_000_000_000) return 'Gaji terlalu besar.';
-  return null;
 }
 
 export async function createBudget(arg1, arg2) {
@@ -354,16 +326,6 @@ export async function deleteBudget(arg1, arg2) {
 
 export function countExpensesIn(expenses, categoryId) {
   return expenses.filter((expense) => expense.category_id === categoryId).length;
-}
-
-// ---------------------------------------------------------------------------
-// Writes: salary
-// ---------------------------------------------------------------------------
-
-export async function saveSalary(arg1, arg2, arg3) {
-  const month = arg3 !== undefined ? arg2 : arg1;
-  const amount = arg3 !== undefined ? arg3 : arg2;
-  return callLedger('saveSalary', { month: monthStart(month), amount: toPositive(amount) });
 }
 
 // ---------------------------------------------------------------------------

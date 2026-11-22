@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { formatDigits, getBudgetSummary, getCashflowSummary } from '../src/lib/money.js';
 import { cashflowByMonth, cashflowPeak } from '../src/lib/charts.js';
 import { buildHistoryRows, validateIncome } from '../src/lib/ledger.js';
-import { validAmount } from '../src/lib/ledger-validation.js';
+import { AMOUNT_MAX, validAmount } from '../src/lib/ledger-validation.js';
 
 const budgets = [
   { id: 'food', name: 'Makan', monthly_limit: 1_000_000, color: 'lime' },
@@ -15,77 +15,91 @@ const budgets = [
 // getCashflowSummary
 // ---------------------------------------------------------------------------
 
-test('getCashflowSummary matches getBudgetSummary when nothing came in', () => {
+test('getCashflowSummary takes incomes first and reports a negative balance when empty', () => {
   const expenses = [{ category_id: 'food', amount: 400_000 }];
-  const base = getBudgetSummary(5_000_000, budgets, expenses);
-  const flow = getCashflowSummary(5_000_000, [], budgets, expenses);
+  const base = getBudgetSummary(budgets, expenses);
+  const flow = getCashflowSummary([], budgets, expenses);
 
-  assert.equal(flow.remaining, base.remaining);
-  assert.equal(flow.inflow, 5_000_000);
   assert.equal(flow.income, 0);
+  assert.equal(flow.inflow, 0);
+  assert.equal(flow.remaining, -400_000);
+  assert.equal(flow.spent, 400_000);
+  assert.equal(flow.allocated, base.allocated);
   assert.deepEqual(
     flow.categories.map((category) => category.spent),
     base.categories.map((category) => category.spent),
   );
 });
 
-test('getCashflowSummary counts extra income into the balance', () => {
+test('getCashflowSummary remaining = income − expenses', () => {
   const expenses = [{ category_id: 'food', amount: 400_000 }];
   const incomes = [{ amount: 1_500_000 }, { amount: 500_000 }];
-  const flow = getCashflowSummary(5_000_000, incomes, budgets, expenses);
+  const flow = getCashflowSummary(incomes, budgets, expenses);
 
   assert.equal(flow.income, 2_000_000);
-  assert.equal(flow.inflow, 7_000_000);
-  // 7.000.000 in, 400.000 out.
-  assert.equal(flow.remaining, 6_600_000);
+  assert.equal(flow.inflow, 2_000_000);
+  // 2.000.000 in, 400.000 out.
+  assert.equal(flow.remaining, 1_600_000);
   assert.equal(flow.spent, 400_000);
+  assert.equal(flow.savedPercent, 80);
+  assert.equal('salary' in flow, false);
 });
 
-test('getCashflowSummary keeps the budget base on the salary alone', () => {
-  // The reason the two functions are separate: a bonus must not make an
-  // over-budget category look compliant, and it must not become spendable
-  // budget. Only the account-level balance moves.
+test('getCashflowSummary has no salary argument and keeps budget envelopes independent', () => {
+  // The reason the two summaries are separate: a big income must not make an
+  // over-budget category look compliant. Only the account-level balance moves.
   const expenses = [{ category_id: 'food', amount: 1_400_000 }];
-  const flow = getCashflowSummary(2_000_000, [{ amount: 5_000_000 }], budgets, expenses);
+  const flow = getCashflowSummary([{ amount: 5_000_000 }], budgets, expenses);
 
-  assert.equal(flow.salary, 2_000_000);
+  assert.equal(flow.income, 5_000_000);
+  assert.equal(flow.inflow, 5_000_000);
   assert.equal(flow.allocated, 3_000_000);
   assert.equal(flow.overBudgetCount, 1);
   assert.equal(flow.categories.find((category) => category.id === 'food').over, true);
-  // …while the balance is positive, because the extra money really is there.
-  assert.equal(flow.remaining, 5_600_000);
+  assert.equal(flow.remaining, 3_600_000);
 });
 
-test('getCashflowSummary reports a negative balance when spending beats all inflow', () => {
-  const flow = getCashflowSummary(1_000_000, [{ amount: 500_000 }], budgets, [
+test('getCashflowSummary reports a negative balance when spending beats income', () => {
+  const flow = getCashflowSummary([{ amount: 500_000 }], budgets, [
     { category_id: 'food', amount: 2_000_000 },
   ]);
 
-  assert.equal(flow.inflow, 1_500_000);
-  assert.equal(flow.remaining, -500_000);
+  assert.equal(flow.inflow, 500_000);
+  assert.equal(flow.remaining, -1_500_000);
+  assert.equal(flow.savedPercent, 0);
+});
+
+test('getCashflowSummary produces exactly the agreed interface', () => {
+  const flow = getCashflowSummary();
+
+  assert.deepEqual(Object.keys(flow).sort(), [
+    'allocated', 'categories', 'income', 'inflow', 'overBudgetCount',
+    'remaining', 'savedPercent', 'spent',
+  ]);
 });
 
 test('getCashflowSummary survives junk in every argument', () => {
-  const flow = getCashflowSummary('abc', 'not-an-array', null, undefined);
+  const flow = getCashflowSummary('not-an-array', null, undefined);
 
-  assert.equal(flow.salary, 0);
   assert.equal(flow.income, 0);
   assert.equal(flow.inflow, 0);
+  assert.equal(flow.spent, 0);
   assert.equal(flow.remaining, 0);
   assert.equal(flow.savedPercent, 0);
   assert.deepEqual(flow.categories, []);
 
   // A numeric column arriving as a string is normal, not junk.
-  assert.equal(getCashflowSummary('1000000', [{ amount: '250000' }]).income, 250_000);
+  assert.equal(getCashflowSummary([{ amount: '250000' }]).income, 250_000);
   // A negative or malformed income row must not reduce the balance below zero.
-  assert.equal(getCashflowSummary(1_000_000, [{ amount: -5 }, { amount: 'x' }]).income, 0);
+  assert.equal(getCashflowSummary([{ amount: -5 }, { amount: 'x' }]).income, 0);
 });
 
 test('getCashflowSummary defaults its income array', () => {
-  const flow = getCashflowSummary(1_000_000);
+  const flow = getCashflowSummary();
 
   assert.equal(flow.income, 0);
-  assert.equal(flow.inflow, 1_000_000);
+  assert.equal(flow.inflow, 0);
+  assert.equal(flow.remaining, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -136,6 +150,20 @@ test('validateIncome treats a missing or blank source as no source at all', () =
   assert.deepEqual(validateIncome({ ...base, source: '   ' }), {});
   // 40 characters exactly is the limit, not one past it.
   assert.deepEqual(validateIncome({ ...base, source: 'x'.repeat(40) }), {});
+});
+
+test('validateIncome accepts AMOUNT_MAX but rejects one rupiah past it', () => {
+  const base = { description: 'Bonus', receivedOn: '2026-10-02' };
+
+  assert.deepEqual(validateIncome({ ...base, amount: String(AMOUNT_MAX) }), {});
+  const errors = validateIncome({ ...base, amount: String(AMOUNT_MAX + 1) });
+  assert.equal(errors.amount, 'Nominal terlalu besar.');
+});
+
+test('validateIncome does not ask for a category', () => {
+  // The category is absent from every call and produces no error, which is the
+  // whole reason income is not filed under a budget.
+  assert.deepEqual(validateIncome({ description: 'Bonus', amount: '1', receivedOn: '2026-10-02' }), {});
 });
 
 // ---------------------------------------------------------------------------
@@ -189,12 +217,6 @@ test('formatDigits exposes nothing the amount validator would reject', () => {
   assert.equal(validAmount(shown.replace(/\./g, '')), true);
 });
 
-test('validateIncome does not ask for a category', () => {
-  // The category is absent from every call and produces no error, which is the
-  // whole reason income is not filed under a budget.
-  assert.deepEqual(validateIncome({ description: 'Bonus', amount: '1', receivedOn: '2026-10-02' }), {});
-});
-
 // ---------------------------------------------------------------------------
 // cashflowByMonth
 // ---------------------------------------------------------------------------
@@ -202,47 +224,24 @@ test('validateIncome does not ask for a category', () => {
 const expense = (spent_on, amount) => ({ spent_on, amount });
 const income = (received_on, amount) => ({ received_on, amount });
 
-test('cashflowByMonth counts salary as part of the inflow', () => {
-  const series = cashflowByMonth([], [], [{ key: '2026-08', amount: 5_000_000 }], '2026-08', 1);
-
-  assert.equal(series.length, 1);
-  assert.equal(series[0].inflow, 5_000_000);
-  assert.equal(series[0].outflow, 0);
-  assert.equal(series[0].net, 5_000_000);
-  assert.equal(series[0].salary, 5_000_000);
-  assert.equal(series[0].extra, 0);
-});
-
-test('cashflowByMonth adds income rows on top of the salary', () => {
+test('cashflowByMonth counts income rows as the only inflow', () => {
   const series = cashflowByMonth(
     [income('2026-08-15', 1_000_000), income('2026-08-20', 500_000)],
     [expense('2026-08-03', 2_000_000)],
-    [{ key: '2026-08', amount: 5_000_000 }],
     '2026-08',
     1,
   );
 
-  assert.equal(series[0].extra, 1_500_000);
-  assert.equal(series[0].inflow, 6_500_000);
+  assert.equal(series.length, 1);
+  assert.equal(series[0].inflow, 1_500_000);
   assert.equal(series[0].outflow, 2_000_000);
-  assert.equal(series[0].net, 4_500_000);
-});
-
-test('cashflowByMonth reads the history page row shape too', () => {
-  const series = cashflowByMonth(
-    [],
-    [],
-    [{ month: '2026-08-01', salary: 4_000_000 }],
-    '2026-08',
-    1,
-  );
-
-  assert.equal(series[0].salary, 4_000_000);
-  assert.equal(series[0].inflow, 4_000_000);
+  assert.equal(series[0].net, -500_000);
+  assert.equal('salary' in series[0], false);
+  assert.equal('extra' in series[0], false);
 });
 
 test('cashflowByMonth returns a fixed oldest-first window ending at the month', () => {
-  const series = cashflowByMonth([], [], [], '2026-10', 6);
+  const series = cashflowByMonth([], [], '2026-10', 6);
 
   assert.deepEqual(
     series.map((row) => row.key),
@@ -258,7 +257,6 @@ test('cashflowByMonth keeps rows outside the window out', () => {
   const series = cashflowByMonth(
     [income('2026-01-10', 9_000_000)],
     [expense('2026-04-10', 9_000_000)],
-    [{ key: '2026-01', amount: 9_000_000 }],
     '2026-10',
     3,
   );
@@ -269,28 +267,10 @@ test('cashflowByMonth keeps rows outside the window out', () => {
   assert.equal(series.every((row) => row.inflow === 0 && row.outflow === 0), true);
 });
 
-test('cashflowByMonth puts each row in the month its date belongs to', () => {
-  const series = cashflowByMonth(
-    [income('2026-09-30', 300_000)],
-    [expense('2026-10-01', 100_000)],
-    [],
-    '2026-10',
-    2,
-  );
-
-  assert.equal(series[0].key, '2026-09');
-  assert.equal(series[0].extra, 300_000);
-  assert.equal(series[0].outflow, 0);
-  assert.equal(series[1].key, '2026-10');
-  assert.equal(series[1].outflow, 100_000);
-  assert.equal(series[1].extra, 0);
-});
-
 test('cashflowByMonth ignores rows with an unusable date', () => {
   const series = cashflowByMonth(
     [income('bukan tanggal', 1_000_000), income(null, 1_000_000)],
     [expense(undefined, 1_000_000)],
-    [{ key: '', amount: 5_000_000 }],
     '2026-10',
     1,
   );
@@ -301,10 +281,10 @@ test('cashflowByMonth ignores rows with an unusable date', () => {
 
 test('cashflowByMonth survives no arguments and bad ones', () => {
   assert.deepEqual(cashflowByMonth(), []);
-  assert.deepEqual(cashflowByMonth([], [], [], '', 6), []);
-  assert.deepEqual(cashflowByMonth([], [], [], '2026-10', 0), []);
-  assert.equal(cashflowByMonth('x', 'y', 'z', '2026-10', 3).length, 3);
-  assert.equal(cashflowByMonth(null, null, null, '2026-10', -3).length, 0);
+  assert.deepEqual(cashflowByMonth([], [], '', 6), []);
+  assert.deepEqual(cashflowByMonth([], [], '2026-10', 0), []);
+  assert.equal(cashflowByMonth('x', 'y', '2026-10', 3).length, 3);
+  assert.equal(cashflowByMonth(null, null, '2026-10', -3).length, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -318,7 +298,6 @@ test('cashflowPeak is the largest bar in either series', () => {
     { inflow: 0, outflow: 300_000 },
   ];
 
-  // The outflow bar, not the inflow maximum, so the two rows share one scale.
   assert.equal(cashflowPeak(series), 7_000_000);
 });
 
@@ -342,83 +321,71 @@ test('cashflowPeak coerces string amounts and ignores negatives', () => {
 const spentMonth = (key, spent, byCategory = {}) => ({
   key,
   spent,
-  count: 1,
+  count: spent > 0 ? 1 : 0,
   byCategory,
 });
 
-test('buildHistoryRows measures the balance against salary plus income', () => {
+test('buildHistoryRows measures the balance against that month income', () => {
   const rows = buildHistoryRows({
-    salaryRows: [{ month: '2026-10-01', salary: 5_000_000 }],
     months: [spentMonth('2026-10', 2_000_000, { food: 2_000_000 })],
     budgets,
     incomesByMonth: { '2026-10': [{ amount: 1_500_000 }, { amount: 500_000 }] },
   });
 
-  assert.equal(rows[0].salary, 5_000_000);
   assert.equal(rows[0].income, 2_000_000);
-  assert.equal(rows[0].inflow, 7_000_000);
-  assert.equal(rows[0].saved, 5_000_000);
+  assert.equal(rows[0].inflow, 2_000_000);
+  assert.equal(rows[0].spent, 2_000_000);
+  assert.equal(rows[0].saved, 0);
   assert.equal(rows[0].incomeCount, 2);
+  assert.equal(rows[0].salary, undefined);
 });
 
-test('buildHistoryRows still produces the old numbers without an income key', () => {
+test('buildHistoryRows keeps a month with income but zero expenses', () => {
   const rows = buildHistoryRows({
-    salaryRows: [{ month: '2026-10-01', salary: 5_000_000 }],
-    months: [spentMonth('2026-10', 2_000_000, { food: 2_000_000 })],
+    months: [{ key: '2026-10', spent: 0, count: 0, byCategory: {} }],
     budgets,
+    incomesByMonth: { '2026-10': [{ amount: 3_000_000 }] },
   });
 
-  assert.equal(rows[0].income, 0);
-  assert.equal(rows[0].inflow, 5_000_000);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].income, 3_000_000);
+  assert.equal(rows[0].inflow, 3_000_000);
+  assert.equal(rows[0].spent, 0);
   assert.equal(rows[0].saved, 3_000_000);
+  assert.equal(rows[0].savedPercent, 100);
 });
 
 test('buildHistoryRows keeps a negative month negative', () => {
   const rows = buildHistoryRows({
-    salaryRows: [{ month: '2026-10-01', salary: 1_000_000 }],
     months: [spentMonth('2026-10', 2_000_000, { food: 2_000_000 })],
     budgets,
     incomesByMonth: { '2026-10': [{ amount: 250_000 }] },
   });
 
-  assert.equal(rows[0].inflow, 1_250_000);
-  assert.equal(rows[0].saved, -750_000);
+  assert.equal(rows[0].inflow, 250_000);
+  assert.equal(rows[0].saved, -1_750_000);
   assert.equal(rows[0].savedPercent, 0);
 });
 
-test('buildHistoryRows does not let income pull a month in without a salary', () => {
-  // A month qualifies on its saved salary, not on having any activity at all.
+test('buildHistoryRows ignores an income list for a month with no activity', () => {
+  // An income row of zero is junk, and a bucket with no spend and no income
+  // must not be carried into the history as a placeholder.
   const rows = buildHistoryRows({
-    salaryRows: [{ month: '2026-10-01', salary: 5_000_000 }],
-    months: [spentMonth('2026-09', 100_000), spentMonth('2026-10', 200_000)],
+    months: [{ key: '2026-09', spent: 0, count: 0, byCategory: {} }],
     budgets,
-    incomesByMonth: { '2026-09': [{ amount: 900_000 }] },
+    incomesByMonth: { '2026-09': [{ amount: 0 }] },
   });
 
-  assert.deepEqual(rows.map((row) => row.key), ['2026-10']);
-});
-
-test('buildHistoryRows ignores an income list for a month that was not spent', () => {
-  // The bucket is built from spending, so a month with income and no expenses
-  // has no row to attach the income to.
-  const rows = buildHistoryRows({
-    salaryRows: [{ month: '2026-10-01', salary: 5_000_000 }],
-    months: [spentMonth('2026-10', 200_000)],
-    budgets,
-    incomesByMonth: { '2026-09': [{ amount: 900_000 }], '2026-10': [{ amount: 100_000 }] },
-  });
-
-  assert.equal(rows[0].income, 100_000);
-  assert.equal(rows[0].inflow, 5_100_000);
+  assert.deepEqual(rows, []);
 });
 
 test('buildHistoryRows coerces junk income rows to zero', () => {
   const rows = buildHistoryRows({
-    salaryRows: [{ month: '2026-10-01', salary: 1_000_000 }],
     months: [spentMonth('2026-10', 100_000)],
     budgets,
     incomesByMonth: { '2026-10': [{ amount: 'abc' }, { amount: '250000' }, null] },
   });
 
   assert.equal(rows[0].income, 250_000);
+  assert.equal(rows[0].saved, 150_000);
 });

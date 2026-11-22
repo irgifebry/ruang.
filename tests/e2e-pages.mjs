@@ -61,7 +61,7 @@ const pages = [
   { path: '/', expect: ['PUSAT KENDALI KEUANGAN', 'SISA UANG', 'Anggaran kategori'] },
   { path: '/transactions', expect: ['Catat pengeluaran', 'Kategori', 'Nominal'] },
   { path: '/history', expect: ['Bulan yang', 'Pengeluaran per bulan'] },
-  { path: '/settings', expect: ['Gaji per bulan', 'RIWAYAT GAJI', 'Anggaran kategori', 'Tambah kategori'] },
+  { path: '/settings', expect: ['Catat uang masuk', 'Pemasukan', 'Anggaran kategori', 'Tambah kategori'] },
 ];
 
 for (const page of pages) {

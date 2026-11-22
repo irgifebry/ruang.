@@ -41,10 +41,10 @@ export default function Image() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ fontSize: '68px', fontWeight: 600, letterSpacing: '-0.05em', lineHeight: 1.05, maxWidth: '960px' }}>
-            Ubah gaji bulanan jadi anggaran yang bisa dipantau.
+            Catat pemasukan, atur anggaran, pantau pengeluaran.
           </div>
           <div style={{ fontSize: '30px', color: '#a9a49a', maxWidth: '900px', lineHeight: 1.4 }}>
-            Catat setiap pengeluaran terhadapnya dan lihat sisa uangmu setiap bulan.
+            Semua dicatat manual. Lihat sisa uangmu setiap bulan.
           </div>
         </div>
         <div style={{ fontSize: '22px', color: '#7a756c' }}>ruang-cashflow.vercel.app</div>

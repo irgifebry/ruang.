@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchLedger, updateProfile } from '@/lib/ledger';
 import { useLedgerData, useMutation } from '@/hooks/useLedgerData';
 import { useTheme } from '@/lib/theme';
-import { THEMES } from '@/lib/theme-presets';
+import { THEMES, THEME_SWATCH } from '@/lib/theme-presets';
+import { avatarUrl } from '@/lib/avatar';
 import { refreshProfile } from '@/hooks/useProfile';
 import { createClient } from '@/lib/client';
 import { getSharedSession } from '@/lib/auth-client';
-import { Button, FormMessage, TextField } from '@/components/form';
+import { Button, FormMessage, GhostButton, TextField } from '@/components/form';
 import { PasswordPanel } from '@/components/PasswordPanel';
 import { DeleteAccountPanel } from '@/components/DeleteAccountPanel';
 import { ErrorState, LoadingState, Panel } from '@/components/ui';
@@ -165,10 +166,8 @@ function ProfileContent({ data, reload }) {
   // An upload wins over the provider photo: the user chose it more recently than
   // Google did. `provider_image` is the Google picture, present for anyone who
   // signed in through SSO.
-  const avatarSrc = profile?.avatar_path
-    ? supabase.storage.from('avatars').getPublicUrl(profile.avatar_path).data.publicUrl +
-      (avatarVersion ? `?v=${avatarVersion}` : '')
-    : profile?.provider_image || null;
+  const avatarSrc =
+    avatarUrl(profile?.avatar_path, avatarVersion) ?? profile?.provider_image ?? null;
   const usingProviderPhoto = !profile?.avatar_path && Boolean(profile?.provider_image);
   const initial = (name.trim() || email || 'Pengguna').charAt(0).toUpperCase();
 
@@ -220,9 +219,9 @@ function ProfileContent({ data, reload }) {
                   {avatarSrc ? 'Ganti foto' : 'Unggah foto'}
                 </Button>
                 {avatarSrc && (
-                  <Button onClick={handleRemoveAvatar} busy={avatarBusy} tone="ghost">
-                    Hapus
-                  </Button>
+                  <GhostButton onClick={handleRemoveAvatar} disabled={avatarBusy}>
+                    {avatarBusy ? 'Menghapus...' : 'Hapus'}
+                  </GhostButton>
                 )}
               </div>
               <small className="text-ruang-subtle text-[12px] leading-[1.6]">
@@ -315,7 +314,10 @@ function ProfileContent({ data, reload }) {
 
 /** One theme choice, rendered as a labelled swatch. */
 function ThemeOption({ item, selected, onSelect }) {
-  const dark = item.id !== 'light';
+  // `system` currently previews the dark palette. The preview has to be an
+  // explicit palette, not the live `--c-*` tokens: only one theme is active on
+  // the page, so reading the tokens would show the same miniature twice.
+  const swatch = THEME_SWATCH[item.id === 'light' ? 'light' : 'dark'];
 
   return (
     <label className="relative cursor-pointer">
@@ -336,21 +338,12 @@ function ThemeOption({ item, selected, onSelect }) {
             visible instead of something the user has to imagine. */}
         <span
           className="flex h-[22px] overflow-hidden border border-ruang-line bg-ruang-bg"
-          style={
-            dark
-              ? {
-                  '--c-bg': '11 13 12',
-                  '--c-shell': '12 15 13',
-                  '--c-body': '168 176 167',
-                  '--c-accent': '201 251 85',
-                }
-              : {
-                  '--c-bg': '246 247 242',
-                  '--c-shell': '255 255 255',
-                  '--c-body': '74 82 71',
-                  '--c-accent': '122 168 12',
-                }
-          }
+          style={{
+            '--c-bg': swatch.bg,
+            '--c-shell': swatch.shell,
+            '--c-body': swatch.body,
+            '--c-accent': swatch.accent,
+          }}
         >
           <span className="w-[22%] h-full bg-ruang-shell" />
           <span className="flex-1 h-full flex items-center px-[4px] gap-[3px]">

@@ -36,6 +36,21 @@ export const DEFAULT_THEME = 'dark';
 export const FAVICON_FILL = { dark: '#c9fb55', light: '#7aa80c' };
 export const FAVICON_INK = { dark: '#11150b', light: '#fafcf4' };
 
+/**
+ * RGB triples for the miniature theme previews on `/settings/profile`.
+ *
+ * These are deliberately literal. The swatch has to show the *other* palette
+ * while only one of `:root` / `.theme-light` is active on the page, so it cannot
+ * read the live `--c-*` tokens — that would paint both previews with whichever
+ * theme is currently selected. The values mirror `globals.css`; keeping them
+ * here means the component no longer carries a second copy of the palette, the
+ * same way the favicon colours live in this module rather than in the JSX.
+ */
+export const THEME_SWATCH = {
+  dark: { bg: '11 13 12', shell: '12 15 13', body: '168 176 167', accent: '201 251 85' },
+  light: { bg: '246 247 242', shell: '255 255 255', body: '74 82 71', accent: '122 168 12' },
+};
+
 /** Whether the given theme id resolves to the light palette right now. */
 export function resolvesToLight(theme) {
   if (theme === 'light') return true;

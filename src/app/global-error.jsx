@@ -29,7 +29,7 @@ export default function GlobalError({ error, reset }) {
           fontFamily: 'system-ui, -apple-system, sans-serif',
         }}
       >
-        <main style={{ padding: '24px', maxWidth: '440px', textAlign: 'center' }}>
+        <main id="konten" style={{ padding: '24px', maxWidth: '440px', textAlign: 'center' }}>
           <h1 style={{ margin: '0 0 8px', fontSize: '34px', letterSpacing: '-0.05em', fontWeight: 500 }}>
             Ada yang <span style={{ color: 'rgb(var(--c-accent-text, 201 251 85))', fontStyle: 'italic', fontWeight: 400 }}>salah.</span>
           </h1>
