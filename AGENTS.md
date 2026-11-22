@@ -383,4 +383,13 @@ Rotating a Google client secret: Cloud Console → Credentials → edit → rese
   `DataError` with the same string, so the pages' `<ErrorState message={error} />`
   is byte-identical either way. Do not reintroduce a pre-flight session check;
   it cannot make the failure case any better and it always costs a round trip.
+- **Writes stay immediate; only the refresh is delayed.** `useLedgerData.reload()`
+  no longer flips `loading` — that unmounted the page and reset its scroll. It
+  debounces a silent re-read by `SILENT_REFRESH_DELAY_MS` (2000ms) and keeps the
+  old data on screen while it happens; a failed sync sets `syncError` rather than
+  replacing the page with an error. Pages must call `patchData()` with a helper
+  from `optimistic-ledger.js` after a successful write, or the UI will sit stale
+  for those two seconds. The write itself is **never** delayed: losing data to
+  save a request is not a trade-off. A load that actually failed (no data) still
+  retries immediately with the full loading state.
 - **No pagination** on transactions — the list grows with usage.

@@ -6,6 +6,12 @@ import { useLedgerData, useMutation } from '@/hooks/useLedgerData';
 import { useScrollLock } from '@/hooks/useScrollLock';
 import { createClient } from '@/lib/client';
 import {
+  applyExpenseWrite,
+  applyIncomeWrite,
+  removeBudget,
+  removeLedgerRow,
+} from '@/lib/optimistic-ledger';
+import {
   countExpensesIn,
   createExpense,
   createIncome,
@@ -48,16 +54,16 @@ const KINDS = [
 ];
 
 export default function TransactionsPage() {
-  const { data, loading, error, reload } = useLedgerData(fetchLedger);
+  const { data, loading, error, reload, patchData } = useLedgerData(fetchLedger);
 
   if (loading) return <LoadingState />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!data) return <ErrorState message="Sesi tidak ditemukan. Silakan masuk kembali." />;
 
-  return <TransactionsContent data={data} reload={reload} />;
+  return <TransactionsContent data={data} reload={reload} patchData={patchData} />;
 }
 
-function TransactionsContent({ data, reload }) {
+function TransactionsContent({ data, reload, patchData }) {
   /* Which list is on screen. Affects only the filters, the totals and the rows —
      never the form. */
   const [kind, setKind] = useState('expense');
@@ -307,21 +313,27 @@ function TransactionsContent({ data, reload }) {
       return;
     }
 
+    let written = null;
     const ok = await run(async () => {
       if (formIsIncome) {
-        if (editing) {
-          await updateIncome(supabase, editing.id, incomeForm);
-        } else {
-          await createIncome(supabase, incomeForm);
-        }
+        written = editing
+          ? await updateIncome(supabase, editing.id, incomeForm)
+          : await createIncome(supabase, incomeForm);
       } else if (editing) {
-        await updateExpense(supabase, editing.id, form);
+        written = await updateExpense(supabase, editing.id, form);
       } else {
-        await createExpense(supabase, form);
+        written = await createExpense(supabase, form);
       }
     });
 
     if (ok) {
+      // Show the row immediately; the API write has already completed and the
+      // delayed silent refresh will reconcile any server-side defaults.
+      patchData((current) =>
+        formIsIncome
+          ? applyIncomeWrite(current, { id: written?.id, input: incomeForm, editingId: editing?.id })
+          : applyExpenseWrite(current, { id: written?.id, input: form, editingId: editing?.id }),
+      );
       reload();
 
       if (keepOpen && !editing) {
@@ -399,6 +411,7 @@ function TransactionsContent({ data, reload }) {
         );
         if (!done) return false;
 
+        patchData((current) => removeLedgerRow(current, row.id));
         if (editing?.id === row.id) resetForm();
         setSuccess('Transaksi dihapus.');
         reload();
@@ -406,19 +419,20 @@ function TransactionsContent({ data, reload }) {
       },
     });
 
-  /** Warn before a category delete, because its expenses cascade away with it. */
+  /** Removing a category only archives it — its transactions keep the name. */
   const handleCategoryDelete = (budget) => {
     const count = countExpensesIn(expenses, budget.id);
 
     return confirm({
       title: `Hapus kategori "${budget.name}"?`,
       description: count
-        ? `${count} transaksi ikut terhapus permanen dan tidak bisa dikembalikan.`
-        : 'Kategori ini belum punya transaksi, jadi tidak ada data yang hilang.',
+        ? `${count} transaksi tetap tersimpan dengan nama kategori "${budget.name}". Kategori ini hanya hilang dari daftar dan tidak bisa dipakai untuk transaksi baru.`
+        : 'Kategori ini belum punya transaksi. Ia akan hilang dari daftar, dan nama yang sama bisa dipakai lagi.',
       confirmLabel: 'Hapus kategori',
       onConfirm: async () => {
         const done = await run(() => deleteBudget(supabase, budget.id));
         if (!done) return false;
+        patchData((current) => removeBudget(current, budget.id));
         reload();
         return true;
       },

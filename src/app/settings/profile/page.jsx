@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchLedger, updateProfile } from '@/lib/ledger';
+import { applyProfileWrite } from '@/lib/optimistic-ledger';
 import { useLedgerData, useMutation } from '@/hooks/useLedgerData';
 import { useTheme } from '@/lib/theme';
 import { THEMES, THEME_SWATCH } from '@/lib/theme-presets';
@@ -29,18 +30,18 @@ import { ErrorState, LoadingState, Panel } from '@/components/ui';
  */
 
 export default function SettingsProfilePage() {
-  const { data, loading, error, reload } = useLedgerData(fetchLedger);
+  const { data, loading, error, reload, patchData } = useLedgerData(fetchLedger);
 
   if (loading) return <LoadingState label="Memuat profil..." />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!data) return <ErrorState message="Sesi tidak ditemukan. Silakan masuk kembali." />;
 
-  return <ProfileContent data={data} reload={reload} />;
+  return <ProfileContent data={data} reload={reload} patchData={patchData} />;
 }
 
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-function ProfileContent({ data, reload }) {
+function ProfileContent({ data, reload, patchData }) {
   const { profile } = data;
   const theme = useTheme();
   const supabase = useMemo(() => createClient(), []);
@@ -79,6 +80,7 @@ function ProfileContent({ data, reload }) {
     const ok = await run(() => updateProfile(supabase, { name: trimmed }));
     if (!ok) return;
 
+    patchData((current) => applyProfileWrite(current, { name: trimmed }));
     setSuccess('Profil tersimpan.');
     // The sidebar keeps its own cached copy of the profile, so a save here has
     // to tell it to re-read or the new name would only show on a full reload.
@@ -113,6 +115,7 @@ function ProfileContent({ data, reload }) {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Gagal mengunggah foto.');
       const newPath = result.path;
+      patchData((current) => applyProfileWrite(current, { avatar_path: newPath }));
       // `?v=` busts the browser cache: the object keeps the same path, so a
       // plain `src` would keep showing the previous image.
       setAvatarVersion((v) => v + 1);
@@ -143,6 +146,7 @@ function ProfileContent({ data, reload }) {
         if (!response.ok) throw new Error(result.error || 'Gagal menghapus foto.');
       }
       await updateProfile(supabase, { provider_image: null });
+      patchData((current) => applyProfileWrite(current, { avatar_path: null, provider_image: null }));
       setAvatarVersion((v) => v + 1);
       refreshProfile();
       reload();
@@ -156,6 +160,7 @@ function ProfileContent({ data, reload }) {
   /** Applies a choice at once and persists it; a failed save is reported only. */
   async function persistAppearance(patch) {
     theme?.update(patch);
+    patchData((current) => applyProfileWrite(current, patch));
     try {
       await updateProfile(supabase, patch);
     } catch {

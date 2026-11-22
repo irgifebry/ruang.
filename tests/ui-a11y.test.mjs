@@ -135,6 +135,22 @@ test('reset-password puts useSearchParams behind a Suspense boundary', () => {
   assert.match(source, /function ResetPasswordInner\(\)/);
 });
 
+test('saves refresh quietly after a delay instead of unmounting the page', () => {
+  const hook = read('../src/hooks/useLedgerData.js');
+  assert.match(hook, /SILENT_REFRESH_DELAY_MS = 2000/);
+  assert.match(hook, /setTimeout\(async \(\) =>/);
+  assert.match(hook, /setState\(\(prev\) => \(\{ \.\.\.prev, data, syncError: null \}\)\)/);
+  for (const page of [
+    '../src/app/page.jsx',
+    '../src/app/transactions/page.jsx',
+    '../src/app/settings/page.jsx',
+    '../src/app/history/page.jsx',
+    '../src/app/settings/profile/page.jsx',
+  ]) {
+    assert.ok(read(page).includes('loading'), `${page} should still gate its first load`);
+  }
+});
+
 test('drawer nav rows pad the active highlight away from the icon', () => {
   const css = read('../src/app/globals.css');
   assert.match(css, /\.sidebar-drawer \.sidebar-item \{\s*padding-inline: 10px;/);

@@ -13,6 +13,7 @@ import {
   validateBudget,
 } from '@/lib/ledger';
 import { swatchClass, chipClass } from '@/lib/category-colors';
+import { applyBudgetWrite, removeBudget } from '@/lib/optimistic-ledger';
 import { formatIDR } from '@/lib/money';
 import { Button, FormMessage, GhostButton, NumberField, TextField } from '@/components/form';
 import { useConfirm } from '@/components/confirm-dialog';
@@ -23,16 +24,16 @@ import { EmptyState, ErrorState, Eyebrow, LoadingState, Panel } from '@/componen
 const BLANK_BUDGET = { name: '', monthlyLimit: '', color: 'lime' };
 
 export default function SettingsPage() {
-  const { data, loading, error, reload } = useLedgerData(fetchLedger);
+  const { data, loading, error, reload, patchData } = useLedgerData(fetchLedger);
 
   if (loading) return <LoadingState label="Memuat pengaturan..." />;
   if (error) return <ErrorState message={error} onRetry={reload} />;
   if (!data) return <ErrorState message="Sesi tidak ditemukan. Silakan masuk kembali." />;
 
-  return <SettingsContent data={data} reload={reload} />;
+  return <SettingsContent data={data} reload={reload} patchData={patchData} />;
 }
 
-function SettingsContent({ data, reload }) {
+function SettingsContent({ data, reload, patchData }) {
   const [draft, setDraft] = useState(BLANK_BUDGET);
   const [draftErrors, setDraftErrors] = useState({});
   const [editingId, setEditingId] = useState(null);
@@ -68,15 +69,15 @@ function SettingsContent({ data, reload }) {
       return;
     }
 
+    let written = null;
     const ok = await run(async () => {
-      if (editingId) {
-        await updateBudget(editingId, draft);
-      } else {
-        await createBudget(draft);
-      }
+      written = editingId ? await updateBudget(editingId, draft) : await createBudget(draft);
     });
 
     if (ok) {
+      patchData((current) =>
+        applyBudgetWrite(current, { id: written?.id, input: draft, editingId }),
+      );
       setSuccess(editingId ? 'Kategori diperbarui.' : 'Kategori ditambahkan.');
       setDraft(BLANK_BUDGET);
       setDraftErrors({});
@@ -114,6 +115,7 @@ function SettingsContent({ data, reload }) {
         const ok = await run(() => deleteBudget(budget.id));
         if (!ok) return false;
 
+        patchData((current) => removeBudget(current, budget.id));
         setSuccess('Kategori dihapus dari daftar. Transaksinya tetap tersimpan.');
         reload();
         return true;
