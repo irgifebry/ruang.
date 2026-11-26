@@ -1,0 +1,13 @@
+# mobile/ — generated/ignored output for the Expo app
+
+node_modules/
+dist/
+.expo/
+
+# The root .gitignore excludes every docs/ directory; the native parity audit
+# is a deliverable, so re-include only this folder and its contents.
+!docs/
+!docs/**
+
+# Local env (contains a public Turnstile site key)
+.env

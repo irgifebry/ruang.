@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "ruang",
+    "slug": "ruang",
+    "scheme": "ruang",
+    "linking": {
+      "prefixes": ["ruang://", "https://ruang-cashflow.vercel.app/"],
+      "config": {
+        "screens": {
+          "reset-password": "reset-password",
+          "oauth-consent": "oauth-consent",
+          "oauth-return": "oauth-return"
+        }
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.ruang.app"
+    },
+    "android": {
+      "package": "com.ruang.app"
+    },
+    "plugins": [
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.REPLACE_WITH_IOS_CLIENT_ID"
+        }
+      ]
+    ]
+  }
+}

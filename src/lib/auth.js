@@ -1,7 +1,8 @@
 import { betterAuth } from 'better-auth';
 import bcrypt from 'bcrypt';
 import { nextCookies } from 'better-auth/next-js';
-import { captcha } from 'better-auth/plugins';
+import { bearer } from 'better-auth/plugins';
+import { appAwareCaptcha } from './captcha-plugin.js';
 
 import { Resend } from 'resend';
 import { getPool } from './db.js';
@@ -67,15 +68,22 @@ if (Boolean(turnstileSiteKey) !== Boolean(turnstileSecretKey)) {
   throw new Error('Set both NEXT_PUBLIC_TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY to enable Turnstile.');
 }
 
-const plugins = [nextCookies()];
+/**
+ * `bearer()` is what lets the native client in at all: it accepts
+ * `Authorization: Bearer <token>` in place of the cookie the browser sends,
+ * and returns the token on the `set-auth-token` header so the app can store it.
+ * The web app never sends that header, so this changes nothing for it.
+ */
+const plugins = [bearer(), nextCookies()];
 if (turnstileSecretKey) {
   plugins.push(
-    captcha({
+    appAwareCaptcha({
       provider: 'cloudflare-turnstile',
       secretKey: turnstileSecretKey,
       // The login form already sends `x-captcha-response` on all three flows.
       // Social sign-in creates a session too, so leaving it out would make the
-      // captcha a detour around itself.
+      // captcha a detour around itself. The wrapper skips it for native app
+      // requests, which identify themselves with `x-ruang-app: 1`.
       endpoints: ['/sign-in/email', '/sign-up/email', '/sign-in/social'],
     }),
   );
@@ -225,6 +233,9 @@ export const auth = betterAuth({
     process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
     'http://localhost:3000',
     'https://ruang-cashflow.vercel.app',
+    // The native app returns to its own scheme after a Google sign-in, and the
+    // scheme is fixed at build time, so it is a literal rather than env-driven.
+    'ruang://',
   ].filter(Boolean),
   advanced: {
     trustedProxyHeaders: true,
